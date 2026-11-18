@@ -8,8 +8,6 @@ const stages = [
         screenId: "assessment-screen",
         assessmentMode: "pre",
         title: "Pre-Assessment",
-        description:
-            "This reusable screen will present one video and its related classification question.",
         nextLabel: "Continue to Learning",
     },
     {
@@ -21,8 +19,6 @@ const stages = [
         screenId: "assessment-screen",
         assessmentMode: "post",
         title: "Post-Assessment",
-        description:
-            "This reusable screen will present the post-learning assessment questions.",
         nextLabel: "View Results",
     },
     {
@@ -35,10 +31,7 @@ const screens = [...document.querySelectorAll("[data-screen]")];
 const progressSteps = [...document.querySelectorAll("[data-stage-id]")];
 const assessmentScreen = document.querySelector("#assessment-screen");
 const assessmentTitle = document.querySelector("#assessment-title");
-const assessmentEyebrow = document.querySelector("[data-assessment-eyebrow]");
-const assessmentDescription = document.querySelector(
-    "[data-assessment-description]",
-);
+const assessmentClues = document.querySelector("[data-assessment-clues]");
 const assessmentNextLabel = document.querySelector(
     "[data-assessment-next-label]",
 );
@@ -70,8 +63,7 @@ function showStage(stageIndex, moveFocus = true) {
     if (stage.assessmentMode) {
         assessmentScreen.dataset.assessmentMode = stage.assessmentMode;
         assessmentTitle.textContent = stage.title;
-        assessmentEyebrow.textContent = `Stage ${stageIndex + 1} of 5`;
-        assessmentDescription.textContent = stage.description;
+        assessmentClues.hidden = stage.assessmentMode !== "post";
         assessmentNextLabel.textContent = stage.nextLabel;
     }
 

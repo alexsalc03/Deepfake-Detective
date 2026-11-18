@@ -18,10 +18,8 @@
     <div class="site-shell">
         <header class="app-header">
             <div class="brand">
-                <p class="brand-kicker">University research study</p>
                 <h1>Deepfake Detective</h1>
             </div>
-            <p class="preview-badge">UI preview</p>
         </header>
 
         <nav class="progress-nav" aria-label="Experiment progress">
@@ -57,22 +55,12 @@
                 aria-labelledby="welcome-title"
                 tabindex="-1"
             >
-                <div class="screen-heading">
-                    <p class="eyebrow">Stage 1 of 5</p>
-                    <h2 id="welcome-title" tabindex="-1">Welcome</h2>
-                    <p class="lead">
-                        This page will introduce the study, collect the required background
-                        information, and confirm participant consent before the experiment starts.
-                    </p>
-                </div>
+                <h2 id="welcome-title" class="visually-hidden" tabindex="-1">Welcome</h2>
 
                 <section class="content-section" aria-labelledby="introduction-heading">
                     <div class="section-heading">
-                        <span class="section-number" aria-hidden="true">01</span>
-                        <div>
-                            <h3 id="introduction-heading">Study Introduction</h3>
-                            <p>The official study introduction will appear in this area.</p>
-                        </div>
+                        <h3 id="introduction-heading">Study Introduction</h3>
+                        <p>The official study introduction will appear in this area.</p>
                     </div>
                     <p class="placeholder-note" aria-label="Placeholder for study introduction">
                         <span class="placeholder-label">Placeholder</span>
@@ -83,11 +71,8 @@
                 <div class="welcome-grid">
                     <section class="content-section" aria-labelledby="demographics-heading">
                         <div class="section-heading">
-                            <span class="section-number" aria-hidden="true">02</span>
-                            <div>
-                                <h3 id="demographics-heading">Demographic Questionnaire</h3>
-                                <p>Participant background questions will appear here.</p>
-                            </div>
+                            <h3 id="demographics-heading">Demographic Questionnaire</h3>
+                            <p>Participant background questions will appear here.</p>
                         </div>
                         <p
                             class="placeholder-note"
@@ -100,11 +85,8 @@
 
                     <section class="content-section" aria-labelledby="consent-heading">
                         <div class="section-heading">
-                            <span class="section-number" aria-hidden="true">03</span>
-                            <div>
-                                <h3 id="consent-heading">Participant Consent</h3>
-                                <p>The study consent statement will appear here.</p>
-                            </div>
+                            <h3 id="consent-heading">Participant Consent</h3>
+                            <p>The study consent statement will appear here.</p>
                         </div>
                         <p
                             class="placeholder-note"
@@ -121,12 +103,6 @@
                         Start Experiment
                     </button>
                 </div>
-
-                <p class="scaffold-note">
-                    <strong>Preview navigation only.</strong>
-                    These controls do not record consent, save responses, or begin the
-                    research protocol.
-                </p>
             </section>
 
             <section
@@ -138,20 +114,14 @@
                 tabindex="-1"
                 hidden
             >
-                <div class="screen-heading">
-                    <p class="eyebrow" data-assessment-eyebrow>Stage 2 of 5</p>
-                    <h2 id="assessment-title" tabindex="-1">Pre-Assessment</h2>
-                    <p class="lead" data-assessment-description>
-                        This reusable screen will present one video and its related
-                        classification question.
-                    </p>
-                </div>
+                <h2 id="assessment-title" class="visually-hidden" tabindex="-1">
+                    Pre-Assessment
+                </h2>
 
                 <div class="assessment-layout">
                     <section class="video-section" aria-labelledby="video-heading">
                         <div class="card-topline">
                             <h3 id="video-heading">Video Player</h3>
-                            <span class="status-label">Media placeholder</span>
                         </div>
                         <div class="video-placeholder" aria-label="Placeholder for video player">
                             <span class="play-placeholder" aria-hidden="true"></span>
@@ -174,7 +144,7 @@
 
                     <div class="assessment-details">
                         <section
-                            class="assessment-question assessment-question-wide"
+                            class="assessment-question"
                             aria-labelledby="classification-heading"
                         >
                             <h3 id="classification-heading">Classification Question</h3>
@@ -199,7 +169,12 @@
                             </div>
                         </section>
 
-                        <section class="assessment-question" aria-labelledby="clues-heading">
+                        <section
+                            class="assessment-question"
+                            aria-labelledby="clues-heading"
+                            data-assessment-clues
+                            hidden
+                        >
                             <h3 id="clues-heading">Detection Clues</h3>
                             <p>Detection clue options will appear here.</p>
                             <p class="inline-note">Clues placeholder</p>
@@ -216,11 +191,6 @@
                         <span data-assessment-next-label>Continue to Learning</span>
                     </button>
                 </div>
-
-                <p class="scaffold-note">
-                    <strong>Preview navigation only.</strong>
-                    This layout does not play video or collect assessment answers.
-                </p>
             </section>
 
             <section
@@ -231,18 +201,12 @@
                 tabindex="-1"
                 hidden
             >
-                <div class="screen-heading">
-                    <p class="eyebrow">Stage 3 of 5</p>
-                    <h2 id="learning-title" tabindex="-1">Interactive Learning</h2>
-                    <p class="lead">
-                        This space will guide participants through a short educational module
-                        and an interactive practice exercise.
-                    </p>
-                </div>
+                <h2 id="learning-title" class="visually-hidden" tabindex="-1">
+                    Interactive Learning
+                </h2>
 
                 <div class="learning-layout">
                     <section class="module-title-card" aria-labelledby="module-title-heading">
-                        <p class="card-kicker">Current module</p>
                         <h3 id="module-title-heading">Module Title</h3>
                         <p class="placeholder-note" aria-label="Placeholder for module title">
                             <span class="placeholder-label">Module title placeholder</span>
@@ -269,7 +233,6 @@
                     >
                         <div class="card-topline">
                             <h3 id="educational-content-heading">Educational Content</h3>
-                            <span class="status-label">Content area</span>
                         </div>
                         <p class="placeholder-note" aria-label="Placeholder for educational content">
                             <span class="placeholder-label">Educational content</span>
@@ -284,7 +247,6 @@
                     >
                         <div class="card-topline">
                             <h3 id="exercise-heading">Interactive Exercise</h3>
-                            <span class="status-label">Practice area</span>
                         </div>
                         <p class="placeholder-note" aria-label="Placeholder for interactive exercise">
                             <span class="placeholder-label">Exercise placeholder</span>
@@ -302,11 +264,6 @@
                         Continue to Post-Assessment
                     </button>
                 </div>
-
-                <p class="scaffold-note">
-                    <strong>Preview navigation only.</strong>
-                    Learning content and exercise logic are not active in this phase.
-                </p>
             </section>
 
             <section
@@ -317,14 +274,7 @@
                 tabindex="-1"
                 hidden
             >
-                <div class="screen-heading">
-                    <p class="eyebrow">Stage 5 of 5</p>
-                    <h2 id="results-title" tabindex="-1">Results</h2>
-                    <p class="lead">
-                        This final screen will summarize assessment performance and provide the
-                        approved data export controls.
-                    </p>
-                </div>
+                <h2 id="results-title" class="visually-hidden" tabindex="-1">Results</h2>
 
                 <div class="results-grid">
                     <section class="metric-card" aria-labelledby="pre-performance-heading">
@@ -347,7 +297,6 @@
                 <section class="comparison-section" aria-labelledby="comparison-heading">
                     <div class="card-topline">
                         <h3 id="comparison-heading">Performance Comparison</h3>
-                        <span class="status-label">Summary area</span>
                     </div>
                     <p
                         class="placeholder-note"
@@ -376,17 +325,11 @@
                         Back to Post-Assessment
                     </button>
                 </div>
-
-                <p class="scaffold-note">
-                    <strong>Preview only.</strong>
-                    No statistics are calculated, no scores are shown, and no data is exported.
-                </p>
             </section>
         </main>
 
         <footer class="app-footer">
-            <p>Deepfake Detective &middot; University research prototype</p>
-            <p>UI preview for Phase 2</p>
+            <p>Deepfake Detective</p>
         </footer>
     </div>
 
