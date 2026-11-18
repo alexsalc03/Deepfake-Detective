@@ -4,8 +4,9 @@ Deepfake Detective is a lightweight, locally running web application for a
 university research project. It will study whether interactive learning can
 improve people's ability to recognize political deepfakes.
 
-This repository currently contains only the initial project scaffold. The
-application interface and functionality have not been implemented yet.
+The repository currently contains the initial application interface and
+stage navigation. Experiment content loading, response collection, scoring,
+and data export have not been implemented yet.
 
 ## Technology stack
 
@@ -57,13 +58,17 @@ Then open <http://localhost:8000> in a web browser. Stop the server with
 The HTTP server is needed so that the browser can load the JSON data and media
 files consistently.
 
-## Planned application flow
+## Application flow
 
 1. Welcome/Demographics
-2. Pre-Test
+2. Pre-Assessment
 3. Learning
-4. Post-Test
+4. Post-Assessment
 5. Results
+
+The current interface provides temporary preview navigation between these
+stages. These controls do not record consent, save responses, or run the
+research protocol.
 
 ## Research content
 
