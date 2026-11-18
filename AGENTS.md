@@ -139,3 +139,23 @@ The application is a university research prototype, not a production platform.
 ## Important Rule
 
 Do not implement additional features or introduce new technologies without explaining why they are necessary and obtaining approval.
+
+
+## UI/UX Design
+
+For UI design and visual refinement tasks, use the
+frontend-design skill when available.
+
+Prioritize balanced proportions, usability, visual hierarchy,
+and compact, comfortable layouts.
+
+Avoid oversized typography, excessive whitespace,
+generic dashboard layouts, and unnecessary cards.
+
+Evaluate the rendered interface visually whenever possible.
+
+The application should feel like a polished, human-centered
+research product rather than a marketing website.
+
+Visual design improvements must not introduce new frameworks
+or dependencies.
