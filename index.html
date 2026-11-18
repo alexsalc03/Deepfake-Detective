@@ -403,57 +403,90 @@
                 tabindex="-1"
                 hidden
             >
-                <h2 id="results-title" class="visually-hidden" tabindex="-1">Results</h2>
+                <div class="results-intro">
+                    <h2 id="results-title" tabindex="-1">Study complete</h2>
+                    <p>
+                        Your pre-assessment and post-assessment performance are
+                        compared below.
+                    </p>
+                </div>
 
                 <div class="results-grid">
-                    <section class="metric-card" aria-labelledby="pre-performance-heading">
-                        <p class="metric-value" aria-label="Performance value placeholder">
-                            &mdash;
+                    <section
+                        class="performance-panel"
+                        aria-labelledby="pre-performance-heading"
+                    >
+                        <h3 id="pre-performance-heading">Pre-assessment</h3>
+                        <p class="performance-primary">
+                            <span id="pre-accuracy" class="metric-value">&mdash;</span>
+                            <span>accuracy</span>
                         </p>
-                        <h3 id="pre-performance-heading">Pre-Assessment Performance</h3>
-                        <p>Pre-assessment performance will appear after the study is completed.</p>
+                        <dl class="metric-list">
+                            <div>
+                                <dt>Correct classifications</dt>
+                                <dd id="pre-correct">&mdash;</dd>
+                            </div>
+                            <div>
+                                <dt>Average confidence</dt>
+                                <dd id="pre-confidence">&mdash;</dd>
+                            </div>
+                        </dl>
                     </section>
 
-                    <section class="metric-card" aria-labelledby="post-performance-heading">
-                        <p class="metric-value" aria-label="Performance value placeholder">
-                            &mdash;
+                    <section
+                        class="performance-panel"
+                        aria-labelledby="post-performance-heading"
+                    >
+                        <h3 id="post-performance-heading">Post-assessment</h3>
+                        <p class="performance-primary">
+                            <span id="post-accuracy" class="metric-value">&mdash;</span>
+                            <span>accuracy</span>
                         </p>
-                        <h3 id="post-performance-heading">Post-Assessment Performance</h3>
-                        <p>Post-assessment performance will appear after the study is completed.</p>
+                        <dl class="metric-list">
+                            <div>
+                                <dt>Correct classifications</dt>
+                                <dd id="post-correct">&mdash;</dd>
+                            </div>
+                            <div>
+                                <dt>Average confidence</dt>
+                                <dd id="post-confidence">&mdash;</dd>
+                            </div>
+                        </dl>
                     </section>
                 </div>
 
                 <section class="comparison-section" aria-labelledby="comparison-heading">
-                    <div class="card-topline">
-                        <h3 id="comparison-heading">Performance Comparison</h3>
-                    </div>
-                    <p
-                        class="placeholder-note"
-                        aria-label="Placeholder for performance comparison"
-                    >
-                        <span class="placeholder-label">Comparison placeholder</span>
-                        The pre- and post-assessment comparison will appear here.
-                    </p>
+                    <h3 id="comparison-heading">Performance comparison</h3>
+                    <dl class="comparison-list">
+                        <div>
+                            <dt>Accuracy difference</dt>
+                            <dd id="accuracy-difference">&mdash;</dd>
+                        </div>
+                        <div>
+                            <dt>Average confidence</dt>
+                            <dd id="confidence-comparison">&mdash;</dd>
+                        </div>
+                    </dl>
                 </section>
 
-                <div class="results-footer-grid">
-                    <section class="content-section" aria-labelledby="metrics-heading">
-                        <h3 id="metrics-heading">Additional Metrics</h3>
-                        <p>Additional study metrics will appear in this area.</p>
-                    </section>
-
-                    <section class="content-section" aria-labelledby="export-heading">
-                        <h3 id="export-heading">Data Export</h3>
-                        <p>The approved result export control will appear here.</p>
-                    </section>
-                </div>
-
-                <div class="screen-actions">
-                    <button class="button button-secondary" type="button" data-previous-stage>
-                        <span class="button-back-icon" aria-hidden="true">&larr;</span>
-                        Back to Post-Assessment
+                <section class="submission-section" aria-labelledby="submission-heading">
+                    <div>
+                        <h3 id="submission-heading">Submit results</h3>
+                        <p id="submission-status">
+                            Automatic submission will be enabled in the next phase.
+                            Your results have not been sent.
+                        </p>
+                    </div>
+                    <button
+                        id="submit-results"
+                        class="button"
+                        type="button"
+                        aria-describedby="submission-status"
+                        disabled
+                    >
+                        Submit Results
                     </button>
-                </div>
+                </section>
             </section>
         </main>
 

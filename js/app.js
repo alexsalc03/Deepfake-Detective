@@ -93,6 +93,14 @@ const learningCorrectAnswer = document.querySelector(
 const learningExplanation = document.querySelector("#learning-explanation");
 const learningCheckAnswer = document.querySelector("#learning-check-answer");
 const learningContinue = document.querySelector("#learning-continue");
+const preCorrect = document.querySelector("#pre-correct");
+const preAccuracy = document.querySelector("#pre-accuracy");
+const preConfidence = document.querySelector("#pre-confidence");
+const postCorrect = document.querySelector("#post-correct");
+const postAccuracy = document.querySelector("#post-accuracy");
+const postConfidence = document.querySelector("#post-confidence");
+const accuracyDifference = document.querySelector("#accuracy-difference");
+const confidenceComparison = document.querySelector("#confidence-comparison");
 const supportedQuestionTypes = new Set([
     "text",
     "number",
@@ -172,6 +180,10 @@ function showStage(stageIndex, moveFocus = true) {
         renderLearningStage();
     } else {
         learningMediaVideo.pause();
+    }
+
+    if (stage.id === "results") {
+        renderResults();
     }
 
     document.title =
@@ -1001,6 +1013,195 @@ function getAssessmentMode() {
 function getAssessmentVideos(mode) {
     const assignedSet = participantSession.videoSets[mode];
     return assessmentVideos.filter((video) => video.set === assignedSet);
+}
+
+function getScoredAssessmentResponses(mode) {
+    return participantSession.assessmentAnswers
+        .filter((response) => response.stage === mode)
+        .map((response) => {
+            const video = assessmentVideos.find(
+                (candidate) => candidate.id === response.videoId,
+            );
+
+            if (!video || !["real", "fake"].includes(response.answer)) {
+                return null;
+            }
+
+            return {
+                response,
+                correctLabel: video.label,
+            };
+        })
+        .filter(Boolean);
+}
+
+function roundPercentage(value) {
+    return Math.round(value * 10) / 10;
+}
+
+function calculatePerformanceMetrics(mode) {
+    const scoredResponses = getScoredAssessmentResponses(mode);
+    const correctClassifications = scoredResponses.filter(
+        ({ response, correctLabel }) => response.answer === correctLabel,
+    ).length;
+    const confidenceValues = scoredResponses
+        .map(({ response }) => response.confidence)
+        .filter(
+            (confidence) =>
+                Number.isFinite(confidence) && confidence >= 0 && confidence <= 100,
+        );
+
+    return {
+        correctClassifications,
+        totalClassifications: scoredResponses.length,
+        accuracyPercent: scoredResponses.length
+            ? roundPercentage(
+                  (correctClassifications / scoredResponses.length) * 100,
+              )
+            : null,
+        averageConfidencePercent: confidenceValues.length
+            ? roundPercentage(
+                  confidenceValues.reduce((total, value) => total + value, 0) /
+                      confidenceValues.length,
+              )
+            : null,
+    };
+}
+
+function calculateExperimentPerformance() {
+    const pre = calculatePerformanceMetrics("pre");
+    const post = calculatePerformanceMetrics("post");
+    const hasAccuracyComparison =
+        pre.accuracyPercent !== null && post.accuracyPercent !== null;
+
+    return {
+        pre,
+        post,
+        accuracyDifferencePercentagePoints: hasAccuracyComparison
+            ? post.accuracyPercent - pre.accuracyPercent
+            : null,
+    };
+}
+
+function prepareAssessmentResponses(mode) {
+    return getScoredAssessmentResponses(mode).map(
+        ({ response, correctLabel }) => ({
+            videoId: response.videoId,
+            correctLabel,
+            classification: response.answer,
+            confidence: Number.isFinite(response.confidence)
+                ? response.confidence
+                : null,
+            selectedClues: Array.isArray(response.clues)
+                ? [...response.clues]
+                : [],
+        }),
+    );
+}
+
+function prepareSubmissionPayload() {
+    return {
+        participantId: participantSession.participantId,
+        demographics: { ...participantSession.demographics },
+        condition: participantSession.condition,
+        videoSets: { ...participantSession.videoSets },
+        assessments: {
+            pre: {
+                responses: prepareAssessmentResponses("pre"),
+            },
+            post: {
+                responses: prepareAssessmentResponses("post"),
+            },
+        },
+        learning: {
+            completedModuleIds: [
+                ...participantSession.learning.completedModuleIds,
+            ],
+            quizAnswers: {
+                ...participantSession.learning.selectedQuizAnswers,
+            },
+            isComplete: participantSession.learning.isComplete,
+        },
+        performance: calculateExperimentPerformance(),
+    };
+}
+
+function formatPercentage(value) {
+    return value === null ? "Not available" : `${value}%`;
+}
+
+function formatAccuracyDifference(value) {
+    if (value === null) {
+        return "Not available";
+    }
+
+    const sign = value > 0 ? "+" : "";
+    return `${sign}${value} percentage points`;
+}
+
+function renderResults() {
+    const performance = calculateExperimentPerformance();
+
+    preCorrect.textContent = `${performance.pre.correctClassifications}/${performance.pre.totalClassifications}`;
+    preAccuracy.textContent = formatPercentage(performance.pre.accuracyPercent);
+    preConfidence.textContent = formatPercentage(
+        performance.pre.averageConfidencePercent,
+    );
+    postCorrect.textContent = `${performance.post.correctClassifications}/${performance.post.totalClassifications}`;
+    postAccuracy.textContent = formatPercentage(performance.post.accuracyPercent);
+    postConfidence.textContent = formatPercentage(
+        performance.post.averageConfidencePercent,
+    );
+    accuracyDifference.textContent = formatAccuracyDifference(
+        performance.accuracyDifferencePercentagePoints,
+    );
+    confidenceComparison.textContent = `${formatPercentage(
+        performance.pre.averageConfidencePercent,
+    )} → ${formatPercentage(performance.post.averageConfidencePercent)}`;
+}
+
+function resetExperimentSession() {
+    Object.assign(participantSession, {
+        participantId: null,
+        consentProvided: false,
+        demographics: {},
+        condition: null,
+        videoSets: {
+            pre: null,
+            post: null,
+        },
+        currentStage: null,
+        assessmentAnswers: [],
+        assessmentProgress: {
+            pre: {
+                videoIndex: 0,
+            },
+            post: {
+                videoIndex: 0,
+            },
+        },
+        learning: {
+            completedModuleIds: [],
+            selectedQuizAnswers: {},
+            isComplete: false,
+        },
+    });
+
+    assessmentSubmitting = false;
+    lastAssessmentSubmissionAt = -Infinity;
+    learningQuizSubmitted = false;
+    demographicsForm.reset();
+    formErrorSummary.hidden = true;
+    clearConsentError();
+    demographicsQuestions
+        .querySelectorAll("[data-demographic-question]")
+        .forEach((question) => clearQuestionError(question));
+    assessmentErrorSummary.hidden = true;
+    assessmentVideo.pause();
+    assessmentVideo.removeAttribute("src");
+    assessmentVideo.load();
+    clearLearningMedia();
+    showStage(0);
 }
 
 function getAssessmentQuestionElement(type) {

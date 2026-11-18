@@ -5,10 +5,10 @@ university research project. It will study whether interactive learning can
 improve people's ability to recognize political deepfakes.
 
 The repository currently contains the application interface, stage navigation,
-the configurable demographic questionnaire and consent gate, and the reusable
-pre/post video assessment, plus the JSON-driven interactive learning stage.
-Assessment scoring, results analysis, and data export have not been implemented
-yet.
+the configurable demographic questionnaire and consent gate, the reusable
+pre/post video assessment, the JSON-driven interactive learning stage, and the
+pre/post Results comparison. Automatic result submission has not been
+implemented yet.
 
 ## Technology stack
 
@@ -40,7 +40,8 @@ deepfake-detective/
 │   ├── ex3.webm
 │   └── ex4.webm
 ├── tests/
-│   └── phase5-learning-check.mjs
+│   ├── phase5-learning-check.mjs
+│   └── phase6-results-check.mjs
 ├── .gitignore
 └── README.md
 ```
@@ -97,7 +98,14 @@ Participant state is held in the existing `participantSession` object in
 the assigned condition and video sets, assessment progress by stage, and the
 submitted assessment answers. Learning state records completed module IDs,
 checked quiz answers, and whether all modules are complete. Nothing is persisted
-to localStorage or exported yet.
+to localStorage or submitted over the network yet.
+
+The Results stage calculates correct classifications, accuracy, and average
+confidence from the in-memory assessment answers and the labels in
+`data/videos.json`. It also prepares a JSON-serializable submission payload with
+the participant, demographic, condition, assessment, learning, and calculated
+performance data. The submission control remains disabled until the network
+workflow is implemented in Phase 7.
 
 ## Research content
 
@@ -265,9 +273,9 @@ With Google Chrome installed, run:
 
 ```bash
 node tests/phase5-learning-check.mjs
+node tests/phase6-results-check.mjs
 ```
 
-The script starts temporary local server and Chrome processes, completes the
-pre-assessment, and verifies module order, quiz blocking and feedback, session
-state, media rendering, invalid configurations, responsive widths, and browser
-console errors.
+The scripts start temporary local server and Chrome processes. Together they
+verify the assessment and learning flow, result calculations, submission
+payload, complete session reset, responsive widths, and browser console errors.
