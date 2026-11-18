@@ -1,0 +1,725 @@
+import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { createServer } from "node:net";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+
+const projectRoot = resolve(import.meta.dirname, "..");
+
+async function getAvailablePort() {
+    return new Promise((resolvePort, reject) => {
+        const server = createServer();
+        server.on("error", reject);
+        server.listen(0, "127.0.0.1", () => {
+            const { port } = server.address();
+            server.close(() => resolvePort(port));
+        });
+    });
+}
+
+async function waitForHttp(url, timeout = 10000) {
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < timeout) {
+        try {
+            const response = await fetch(url);
+            if (response.ok) {
+                return response;
+            }
+        } catch {
+            // The local processes may still be starting.
+        }
+
+        await new Promise((resolveWait) => setTimeout(resolveWait, 100));
+    }
+
+    throw new Error(`Timed out waiting for ${url}`);
+}
+
+class CdpClient {
+    constructor(webSocketUrl) {
+        this.webSocketUrl = webSocketUrl;
+        this.nextId = 1;
+        this.pending = new Map();
+        this.listeners = new Map();
+    }
+
+    async connect() {
+        this.socket = new WebSocket(this.webSocketUrl);
+        await new Promise((resolveOpen, reject) => {
+            this.socket.addEventListener("open", resolveOpen, { once: true });
+            this.socket.addEventListener("error", reject, { once: true });
+        });
+
+        this.socket.addEventListener("message", (event) => {
+            const message = JSON.parse(event.data);
+
+            if (message.id) {
+                const request = this.pending.get(message.id);
+                this.pending.delete(message.id);
+
+                if (message.error) {
+                    request.reject(new Error(message.error.message));
+                } else {
+                    request.resolve(message.result);
+                }
+                return;
+            }
+
+            const handlers = this.listeners.get(message.method) ?? [];
+            handlers.forEach((handler) => handler(message.params));
+        });
+    }
+
+    send(method, params = {}) {
+        const id = this.nextId++;
+        this.socket.send(JSON.stringify({ id, method, params }));
+
+        return new Promise((resolveRequest, rejectRequest) => {
+            this.pending.set(id, {
+                resolve: resolveRequest,
+                reject: rejectRequest,
+            });
+        });
+    }
+
+    on(method, handler) {
+        const handlers = this.listeners.get(method) ?? [];
+        handlers.push(handler);
+        this.listeners.set(method, handlers);
+    }
+
+    async evaluate(expression) {
+        const result = await this.send("Runtime.evaluate", {
+            expression,
+            awaitPromise: true,
+            returnByValue: true,
+            userGesture: true,
+        });
+
+        if (result.exceptionDetails) {
+            throw new Error(
+                result.exceptionDetails.exception?.description ??
+                    result.exceptionDetails.text,
+            );
+        }
+
+        return result.result.value;
+    }
+
+    close() {
+        this.socket?.close();
+    }
+}
+
+async function waitFor(client, expression, label, timeout = 8000) {
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < timeout) {
+        if (await client.evaluate(`Boolean(${expression})`)) {
+            return;
+        }
+        await new Promise((resolveWait) => setTimeout(resolveWait, 100));
+    }
+
+    throw new Error(`Timed out waiting for ${label}`);
+}
+
+async function completeDemographics(client) {
+    await waitFor(client, "formReady", "demographics configuration");
+
+    await client.evaluate(`
+        (() => {
+            const setValue = (selector, value, eventName = "input") => {
+                const control = document.querySelector(selector);
+                control.value = value;
+                control.dispatchEvent(new Event(eventName, { bubbles: true }));
+            };
+
+            setValue("#demographic-age", "25");
+            document.querySelector('input[name="demographic-gender"][value="Woman"]').click();
+            setValue(
+                "#demographic-education_level",
+                "Bachelor's degree",
+                "change"
+            );
+            document.querySelector(
+                'input[name="demographic-ai_content_familiarity"][value="Moderately familiar"]'
+            ).click();
+            document.querySelector(
+                'input[name="demographic-deepfake_experience"][value="Limited experience"]'
+            ).click();
+            document.querySelector("#consent-checkbox").click();
+            document.querySelector("#start-experiment").click();
+            return true;
+        })()
+    `);
+
+    await waitFor(
+        client,
+        "document.body.dataset.activeStage === 'pre-assessment'",
+        "pre-assessment stage",
+    );
+}
+
+async function completePreAssessment(client) {
+    await waitFor(
+        client,
+        "assessmentContentReady && participantSession.condition !== null",
+        "assessment content",
+    );
+
+    for (let index = 0; index < 2; index += 1) {
+        await waitFor(
+            client,
+            "!document.querySelector('#assessment-submit').disabled",
+            `assessment video ${index + 1}`,
+        );
+        await waitFor(
+            client,
+            "performance.now() - lastAssessmentSubmissionAt > 500",
+            `assessment submission cooldown ${index + 1}`,
+        );
+
+        await client.evaluate(`
+            (() => {
+                document.querySelector(
+                    '#assessment-questions input[name="assessment-classification"]'
+                ).click();
+                const confidence = document.querySelector("#assessment-confidence");
+                confidence.value = "50";
+                confidence.dataset.touched = "true";
+                confidence.dispatchEvent(new Event("input", { bubbles: true }));
+                document.querySelector(
+                    '#assessment-questions input[name="assessment-clues"]'
+                ).click();
+                document.querySelector("#assessment-submit").click();
+                return true;
+            })()
+        `);
+
+        if (index === 0) {
+            await waitFor(
+                client,
+                "participantSession.assessmentProgress.pre.videoIndex === 1",
+                "second pre-assessment video",
+            );
+        }
+    }
+
+    await waitFor(
+        client,
+        "document.body.dataset.activeStage === 'learning'",
+        "Learning stage after the pre-assessment",
+    );
+}
+
+async function setViewport(client, width, height, mobile = false) {
+    await client.send("Emulation.setDeviceMetricsOverride", {
+        width,
+        height,
+        deviceScaleFactor: 1,
+        mobile,
+    });
+}
+
+async function captureViewport(client, path) {
+    const screenshot = await client.send("Page.captureScreenshot", {
+        format: "png",
+        captureBeyondViewport: false,
+    });
+    await writeFile(path, Buffer.from(screenshot.data, "base64"));
+}
+
+async function run() {
+    const serverPort = await getAvailablePort();
+    const chromePort = await getAvailablePort();
+    const chromeProfile = await mkdtemp(join(tmpdir(), "phase5-chrome-"));
+    const consoleErrors = [];
+    let server;
+    let chrome;
+    let client;
+
+    try {
+        server = spawn(
+            "python3",
+            ["-m", "http.server", String(serverPort), "--bind", "127.0.0.1"],
+            {
+                cwd: projectRoot,
+                stdio: "ignore",
+            },
+        );
+        await waitForHttp(`http://127.0.0.1:${serverPort}/`);
+
+        chrome = spawn(
+            "google-chrome",
+            [
+                "--headless=new",
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--no-first-run",
+                "--remote-allow-origins=*",
+                `--remote-debugging-port=${chromePort}`,
+                `--user-data-dir=${chromeProfile}`,
+                "about:blank",
+            ],
+            {
+                cwd: projectRoot,
+                stdio: "ignore",
+            },
+        );
+
+        await waitForHttp(`http://127.0.0.1:${chromePort}/json/version`);
+        const targets = await (
+            await fetch(`http://127.0.0.1:${chromePort}/json/list`)
+        ).json();
+        const pageTarget = targets.find((target) => target.type === "page");
+        assert.ok(pageTarget?.webSocketDebuggerUrl, "Chrome page target exists");
+
+        client = new CdpClient(pageTarget.webSocketDebuggerUrl);
+        await client.connect();
+        await Promise.all([
+            client.send("Page.enable"),
+            client.send("Runtime.enable"),
+            client.send("Log.enable"),
+        ]);
+
+        client.on("Runtime.exceptionThrown", ({ exceptionDetails }) => {
+            consoleErrors.push(
+                exceptionDetails.exception?.description ?? exceptionDetails.text,
+            );
+        });
+        client.on("Runtime.consoleAPICalled", ({ type, args }) => {
+            if (type === "error") {
+                consoleErrors.push(
+                    args.map((arg) => arg.value ?? arg.description).join(" "),
+                );
+            }
+        });
+        client.on("Log.entryAdded", ({ entry }) => {
+            if (entry.level === "error") {
+                consoleErrors.push(entry.text);
+            }
+        });
+
+        await client.send("Page.navigate", {
+            url: `http://127.0.0.1:${serverPort}/`,
+        });
+        await waitFor(
+            client,
+            "document.readyState === 'complete' && document.querySelector('#demographics-form')",
+            "application load",
+        );
+
+        await completeDemographics(client);
+        await completePreAssessment(client);
+
+        assert.equal(
+            await client.evaluate(
+                "document.querySelector('#learning-module-progress').textContent.trim()",
+            ),
+            "Module 1 of 2",
+        );
+        assert.equal(
+            await client.evaluate(
+                "document.querySelector('#learning-module-title').textContent.trim()",
+            ),
+            "Placeholder Module 1",
+        );
+        assert.equal(
+            await client.evaluate(
+                "document.querySelector('#learning-continue').disabled",
+            ),
+            false,
+        );
+        assert.equal(
+            await client.evaluate(
+                "document.querySelector('#learning-quiz').hidden",
+            ),
+            true,
+        );
+        assert.equal(
+            await client.evaluate(
+                "document.querySelector('#learning-media').hidden",
+            ),
+            true,
+            "media is hidden when it is not configured",
+        );
+        assert.equal(
+            await client.evaluate(
+                "document.querySelector('#learning-screen [data-next-stage]') === null",
+            ),
+            true,
+            "Learning has no development stage-jump control",
+        );
+
+        await setViewport(client, 1440, 1000);
+        assert.equal(
+            await client.evaluate(
+                "document.documentElement.scrollWidth <= window.innerWidth",
+            ),
+            true,
+            "desktop layout does not overflow horizontally",
+        );
+        await captureViewport(client, "/tmp/phase5-learning-desktop.png");
+
+        await setViewport(client, 390, 844, true);
+        assert.equal(
+            await client.evaluate(
+                "document.documentElement.scrollWidth <= window.innerWidth",
+            ),
+            true,
+            "mobile layout does not overflow horizontally",
+        );
+        await captureViewport(client, "/tmp/phase5-learning-mobile.png");
+
+        await client.evaluate(
+            "document.querySelector('#learning-continue').click(); true",
+        );
+        await waitFor(
+            client,
+            "document.querySelector('#learning-module-progress').textContent.includes('Module 2 of 2')",
+            "second module",
+        );
+        assert.equal(
+            await client.evaluate(
+                "document.querySelector('#learning-module-title').textContent",
+            ),
+            "Placeholder Module 2",
+        );
+        assert.equal(
+            await client.evaluate(
+                "participantSession.learning.completedModuleIds.length === 1 && !participantSession.learning.isComplete",
+            ),
+            true,
+            "only the continued module is marked complete",
+        );
+        await setViewport(client, 1440, 1000);
+        assert.equal(
+            await client.evaluate(
+                "document.documentElement.scrollWidth <= window.innerWidth",
+            ),
+            true,
+            "desktop quiz layout does not overflow horizontally",
+        );
+        await captureViewport(client, "/tmp/phase5-learning-quiz-desktop.png");
+        await setViewport(client, 390, 844, true);
+        assert.equal(
+            await client.evaluate(
+                "document.documentElement.scrollWidth <= window.innerWidth",
+            ),
+            true,
+            "mobile quiz layout does not overflow horizontally",
+        );
+        await captureViewport(client, "/tmp/phase5-learning-quiz-mobile.png");
+
+        assert.equal(
+            await client.evaluate(
+                "document.querySelector('#learning-continue').disabled",
+            ),
+            true,
+            "quiz module cannot be skipped",
+        );
+
+        await client.evaluate(
+            "document.querySelector('#learning-check-answer').click(); true",
+        );
+        assert.equal(
+            await client.evaluate(
+                "!document.querySelector('#learning-quiz-error').hidden",
+            ),
+            true,
+            "submitting with no answer shows validation",
+        );
+
+        await client.evaluate(`
+            (() => {
+                const answers = [...document.querySelectorAll(
+                    '#learning-quiz input[name="learning-quiz-answer"]'
+                )];
+                answers.at(-1).click();
+                document.querySelector("#learning-check-answer").click();
+                return true;
+            })()
+        `);
+        await waitFor(
+            client,
+            "!document.querySelector('#learning-feedback').hidden",
+            "quiz feedback",
+        );
+        assert.equal(
+            await client.evaluate(
+                "document.querySelector('#learning-feedback').classList.contains('is-incorrect')",
+            ),
+            true,
+        );
+        assert.match(
+            await client.evaluate(
+                "document.querySelector('#learning-correct-answer').textContent",
+            ),
+            /Placeholder answer A/,
+        );
+        assert.equal(
+            await client.evaluate(
+                "document.querySelector('#learning-continue').disabled",
+            ),
+            false,
+        );
+
+        await client.evaluate(
+            "document.querySelector('#learning-continue').click(); true",
+        );
+        await waitFor(
+            client,
+            "document.body.dataset.activeStage === 'post-assessment'",
+            "post-assessment after Learning",
+        );
+        assert.equal(
+            await client.evaluate(
+                "participantSession.learning.isComplete && participantSession.learning.completedModuleIds.length === 2",
+            ),
+            true,
+        );
+        assert.equal(
+            await client.evaluate(
+                "Object.keys(participantSession.learning.selectedQuizAnswers).length === 1",
+            ),
+            true,
+        );
+        assert.equal(
+            await client.evaluate(
+                "participantSession.learning.selectedQuizAnswers['placeholder-module-2'] === 'c'",
+            ),
+            true,
+            "the selected quiz answer is recorded",
+        );
+
+        await client.evaluate(`
+            document.querySelector(
+                "#assessment-screen [data-previous-stage]"
+            ).click();
+            true
+        `);
+        await waitFor(
+            client,
+            "document.body.dataset.activeStage === 'learning'",
+            "return to the final Learning module",
+        );
+        assert.equal(
+            await client.evaluate(
+                "!document.querySelector('#learning-feedback').hidden && document.querySelector('#learning-feedback').classList.contains('is-incorrect')",
+            ),
+            true,
+            "the submitted quiz state is restored",
+        );
+
+        await client.evaluate(`
+            (() => {
+                participantSession.learning = {
+                    completedModuleIds: ["placeholder-module-1"],
+                    selectedQuizAnswers: {},
+                    isComplete: false
+                };
+                renderLearningStage();
+                document.querySelector(
+                    '#learning-quiz input[name="learning-quiz-answer"][value="a"]'
+                ).click();
+                document.querySelector("#learning-check-answer").click();
+                return true;
+            })()
+        `);
+        await waitFor(
+            client,
+            "!document.querySelector('#learning-feedback').hidden",
+            "correct quiz feedback",
+        );
+        assert.equal(
+            await client.evaluate(
+                "document.querySelector('#learning-feedback').classList.contains('is-incorrect')",
+            ),
+            false,
+            "correct answers use the non-error feedback state",
+        );
+        assert.equal(
+            await client.evaluate(
+                "document.querySelector('#learning-feedback-result').textContent",
+            ),
+            "Correct",
+        );
+        await client.evaluate(
+            "document.querySelector('#learning-continue').click(); true",
+        );
+        await waitFor(
+            client,
+            "document.body.dataset.activeStage === 'post-assessment'",
+            "post-assessment after a correct answer",
+        );
+
+        await client.evaluate(`
+            (() => {
+                participantSession.learning = {
+                    completedModuleIds: [],
+                    selectedQuizAnswers: {},
+                    isComplete: false
+                };
+                initialiseLearningContent([
+                    {
+                        id: "image-check",
+                        title: "Image check",
+                        content: ["Placeholder image content."],
+                        media: {
+                            type: "image",
+                            src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='9'%3E%3C/svg%3E",
+                            alt: "Placeholder image"
+                        }
+                    }
+                ]);
+                showStage(2, false);
+                return true;
+            })()
+        `);
+        await waitFor(
+            client,
+            "document.querySelector('#learning-media-image').naturalWidth === 16",
+            "configured image media",
+        );
+        assert.equal(
+            await client.evaluate(
+                "!document.querySelector('#learning-media').hidden && !document.querySelector('#learning-media-image').hidden",
+            ),
+            true,
+        );
+        assert.equal(
+            await client.evaluate(`
+                (() => {
+                    const image = document.querySelector("#learning-media-image");
+                    const bounds = image.getBoundingClientRect();
+                    return Math.abs(bounds.width / bounds.height - 16 / 9) < 0.01;
+                })()
+            `),
+            true,
+            "image preserves its configured aspect ratio",
+        );
+
+        await client.evaluate(`
+            (() => {
+                initialiseLearningContent([
+                    {
+                        id: "video-check",
+                        title: "Video check",
+                        content: ["Placeholder video content."],
+                        media: {
+                            type: "video",
+                            src: "media/ex.webm",
+                            alt: "Placeholder video"
+                        }
+                    }
+                ]);
+                return true;
+            })()
+        `);
+        await waitFor(
+            client,
+            "document.querySelector('#learning-media-video').readyState >= 1",
+            "configured video metadata",
+        );
+        assert.equal(
+            await client.evaluate(
+                "!document.querySelector('#learning-media').hidden && !document.querySelector('#learning-media-video').hidden",
+            ),
+            true,
+        );
+        assert.equal(
+            await client.evaluate(`
+                (() => {
+                    const video = document.querySelector("#learning-media-video");
+                    const bounds = video.getBoundingClientRect();
+                    return Math.abs(
+                        bounds.width / bounds.height -
+                        video.videoWidth / video.videoHeight
+                    ) < 0.01;
+                })()
+            `),
+            true,
+            "video preserves its source aspect ratio",
+        );
+
+        await client.evaluate(`
+            (() => {
+                participantSession.learning = {
+                    completedModuleIds: [],
+                    selectedQuizAnswers: {},
+                    isComplete: false
+                };
+                initialiseLearningContent([]);
+                showStage(2, false);
+                return true;
+            })()
+        `);
+        assert.equal(
+            await client.evaluate(
+                "!document.querySelector('#learning-config-status').hidden",
+            ),
+            true,
+            "empty configuration is explained",
+        );
+        assert.equal(
+            await client.evaluate(
+                "document.querySelector('#learning-stage-content').hidden",
+            ),
+            true,
+            "empty configuration cannot continue",
+        );
+        assert.equal(
+            await client.evaluate("participantSession.learning.isComplete"),
+            false,
+            "empty configuration does not complete Learning",
+        );
+
+        await client.evaluate(`
+            (() => {
+                initialiseLearningContent([
+                    {
+                        id: "invalid-module",
+                        title: "",
+                        content: []
+                    }
+                ]);
+                showStage(2, false);
+                return true;
+            })()
+        `);
+        assert.equal(
+            await client.evaluate(
+                "!document.querySelector('#learning-config-status').hidden && document.querySelector('#learning-config-status').classList.contains('is-error')",
+            ),
+            true,
+            "invalid configuration is explained",
+        );
+        assert.equal(
+            await client.evaluate(
+                "document.querySelector('#learning-stage-content').hidden",
+            ),
+            true,
+            "invalid configuration cannot continue",
+        );
+
+        assert.deepEqual(consoleErrors, [], "no browser console errors");
+        console.log("Phase 5 browser checks passed.");
+        console.log("Screenshots: /tmp/phase5-learning-desktop.png");
+        console.log("Screenshots: /tmp/phase5-learning-mobile.png");
+        console.log("Screenshots: /tmp/phase5-learning-quiz-desktop.png");
+        console.log("Screenshots: /tmp/phase5-learning-quiz-mobile.png");
+    } finally {
+        client?.close();
+        chrome?.kill("SIGTERM");
+        server?.kill("SIGTERM");
+    }
+}
+
+run().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+});

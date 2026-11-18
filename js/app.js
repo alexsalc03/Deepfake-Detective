@@ -63,6 +63,36 @@ const consentCheckbox = document.querySelector("#consent-checkbox");
 const consentError = document.querySelector("#consent-error");
 const formErrorSummary = document.querySelector("#form-error-summary");
 const startExperimentButton = document.querySelector("#start-experiment");
+const learningConfigStatus = document.querySelector("#learning-config-status");
+const learningStageContent = document.querySelector("#learning-stage-content");
+const learningModuleProgress = document.querySelector("#learning-module-progress");
+const learningModuleProgressTrack = document.querySelector(
+    "#learning-module-progress-track",
+);
+const learningModuleProgressFill = document.querySelector(
+    "#learning-module-progress-fill",
+);
+const learningModuleTitle = document.querySelector("#learning-module-title");
+const learningModuleContent = document.querySelector(
+    "#learning-module-content",
+);
+const learningMedia = document.querySelector("#learning-media");
+const learningMediaImage = document.querySelector("#learning-media-image");
+const learningMediaVideo = document.querySelector("#learning-media-video");
+const learningMediaStatus = document.querySelector("#learning-media-status");
+const learningQuiz = document.querySelector("#learning-quiz");
+const learningQuizControls = document.querySelector("#learning-quiz-controls");
+const learningQuizError = document.querySelector("#learning-quiz-error");
+const learningFeedback = document.querySelector("#learning-feedback");
+const learningFeedbackResult = document.querySelector(
+    "#learning-feedback-result",
+);
+const learningCorrectAnswer = document.querySelector(
+    "#learning-correct-answer",
+);
+const learningExplanation = document.querySelector("#learning-explanation");
+const learningCheckAnswer = document.querySelector("#learning-check-answer");
+const learningContinue = document.querySelector("#learning-continue");
 const supportedQuestionTypes = new Set([
     "text",
     "number",
@@ -79,6 +109,9 @@ let assessmentVideos = [];
 let assessmentContentReady = false;
 let assessmentSubmitting = false;
 let lastAssessmentSubmissionAt = -Infinity;
+let learningModules = [];
+let learningContentReady = false;
+let learningQuizSubmitted = false;
 
 const participantSession = {
     participantId: null,
@@ -98,6 +131,11 @@ const participantSession = {
         post: {
             videoIndex: 0,
         },
+    },
+    learning: {
+        completedModuleIds: [],
+        selectedQuizAnswers: {},
+        isComplete: false,
     },
 };
 
@@ -128,6 +166,12 @@ function showStage(stageIndex, moveFocus = true) {
         assessmentScreen.dataset.assessmentMode = stage.assessmentMode;
         assessmentTitle.textContent = stage.title;
         renderAssessmentStage(stage.assessmentMode);
+    }
+
+    if (stage.id === "learning") {
+        renderLearningStage();
+    } else {
+        learningMediaVideo.pause();
     }
 
     document.title =
@@ -316,6 +360,143 @@ function isRecord(value) {
 
 function isNonEmptyString(value) {
     return typeof value === "string" && value.trim().length > 0;
+}
+
+function isLocalMediaSource(value) {
+    return (
+        isNonEmptyString(value) &&
+        !value.trim().startsWith("//") &&
+        !/^[a-z][a-z\d+.-]*:/i.test(value.trim())
+    );
+}
+
+function validateLearningConfig(config) {
+    if (!Array.isArray(config)) {
+        return {
+            isValid: false,
+            message:
+                "Learning content is not validly configured. The learning stage is unavailable until the research team provides a module list.",
+        };
+    }
+
+    if (config.length === 0) {
+        return {
+            isValid: false,
+            message:
+                "Learning content is not configured. The learning stage is unavailable until the research team provides modules.",
+        };
+    }
+
+    const seenModuleIds = new Set();
+    const modules = [];
+
+    for (const module of config) {
+        if (
+            !isRecord(module) ||
+            !isNonEmptyString(module.id) ||
+            !isNonEmptyString(module.title) ||
+            !Array.isArray(module.content) ||
+            module.content.length === 0 ||
+            module.content.some((paragraph) => !isNonEmptyString(paragraph)) ||
+            seenModuleIds.has(module.id.trim())
+        ) {
+            return {
+                isValid: false,
+                message:
+                    "Learning content is not validly configured. Each module needs a unique ID, title, and at least one text paragraph.",
+            };
+        }
+
+        const normalisedModule = {
+            id: module.id.trim(),
+            title: module.title.trim(),
+            content: module.content.map((paragraph) => paragraph.trim()),
+            media: null,
+            quiz: null,
+        };
+
+        if (module.media !== undefined) {
+            const media = module.media;
+            const isSupportedType =
+                isRecord(media) &&
+                ["image", "video"].includes(media.type);
+            const hasValidSource =
+                isRecord(media) &&
+                (media.type === "video"
+                    ? isLocalMediaSource(media.src)
+                    : isNonEmptyString(media.src));
+
+            if (
+                !isSupportedType ||
+                !hasValidSource ||
+                !isNonEmptyString(media.alt)
+            ) {
+                return {
+                    isValid: false,
+                    message:
+                        'Learning media is not validly configured. Each image or video needs a type, source, and alt text; videos must use a local file.',
+                };
+            }
+
+            normalisedModule.media = {
+                type: media.type,
+                src: media.src.trim(),
+                alt: media.alt.trim(),
+            };
+        }
+
+        if (module.quiz !== undefined) {
+            const quiz = module.quiz;
+            const hasValidOptions =
+                isRecord(quiz) &&
+                Array.isArray(quiz.options) &&
+                quiz.options.length >= 2 &&
+                quiz.options.every(
+                    (option) =>
+                        isRecord(option) &&
+                        isNonEmptyString(option.value) &&
+                        isNonEmptyString(option.label),
+                );
+            const optionValues = hasValidOptions
+                ? quiz.options.map((option) => option.value.trim())
+                : [];
+
+            if (
+                !isRecord(quiz) ||
+                !isNonEmptyString(quiz.question) ||
+                !hasValidOptions ||
+                new Set(optionValues).size !== optionValues.length ||
+                !isNonEmptyString(quiz.correctAnswer) ||
+                !optionValues.includes(quiz.correctAnswer.trim()) ||
+                !isNonEmptyString(quiz.explanation)
+            ) {
+                return {
+                    isValid: false,
+                    message:
+                        "Learning question content is not validly configured. Each question needs text, uniquely valued answer options, a matching correct answer, and an explanation.",
+                };
+            }
+
+            normalisedModule.quiz = {
+                question: quiz.question.trim(),
+                options: quiz.options.map((option) => ({
+                    value: option.value.trim(),
+                    label: option.label.trim(),
+                })),
+                correctAnswer: quiz.correctAnswer.trim(),
+                explanation: quiz.explanation.trim(),
+            };
+        }
+
+        seenModuleIds.add(normalisedModule.id);
+        modules.push(normalisedModule);
+    }
+
+    return {
+        isValid: true,
+        modules,
+        message: "",
+    };
 }
 
 function isConfiguredAssessmentOption(option) {
@@ -1186,6 +1367,332 @@ function handleAssessmentSubmit(event) {
     renderAssessmentStage(mode);
 }
 
+function clearLearningMedia() {
+    learningMedia.hidden = true;
+    learningMediaStatus.hidden = true;
+    learningMediaImage.hidden = true;
+    learningMediaImage.removeAttribute("src");
+    learningMediaImage.alt = "";
+    learningMediaVideo.hidden = true;
+    learningMediaVideo.pause();
+    learningMediaVideo.removeAttribute("src");
+    learningMediaVideo.load();
+}
+
+function setLearningUnavailable(message, isError = false) {
+    learningContentReady = false;
+    learningModules = [];
+    learningStageContent.hidden = true;
+    learningQuizControls.replaceChildren();
+    learningQuiz.hidden = true;
+    learningFeedback.hidden = true;
+    learningCheckAnswer.hidden = true;
+    learningContinue.disabled = true;
+    clearLearningMedia();
+    learningConfigStatus.textContent = message;
+    learningConfigStatus.hidden = false;
+    learningConfigStatus.classList.toggle("is-error", isError);
+}
+
+function initialiseLearningContent(config) {
+    const validation = validateLearningConfig(config);
+
+    if (!validation.isValid) {
+        setLearningUnavailable(validation.message, true);
+        return;
+    }
+
+    learningModules = validation.modules;
+    learningContentReady = true;
+    learningConfigStatus.hidden = true;
+    learningConfigStatus.classList.remove("is-error");
+
+    if (stages[currentStageIndex].id === "learning") {
+        renderLearningStage();
+    }
+}
+
+async function loadLearningContent() {
+    try {
+        const response = await fetch("data/lessons.json");
+        if (!response.ok) {
+            throw new Error("Learning content request failed");
+        }
+
+        const config = await response.json();
+        initialiseLearningContent(config);
+    } catch {
+        setLearningUnavailable(
+            "Learning content could not be loaded. The learning stage is unavailable until the content file can be read.",
+            true,
+        );
+    }
+}
+
+function getCurrentLearningModuleIndex() {
+    const firstIncompleteIndex = learningModules.findIndex(
+        (module) =>
+            !participantSession.learning.completedModuleIds.includes(module.id),
+    );
+
+    return firstIncompleteIndex === -1
+        ? learningModules.length - 1
+        : firstIncompleteIndex;
+}
+
+function renderLearningMedia(module) {
+    clearLearningMedia();
+
+    if (!module.media) {
+        return;
+    }
+
+    learningMedia.hidden = false;
+
+    if (module.media.type === "image") {
+        learningMediaImage.alt = module.media.alt;
+        learningMediaImage.src = module.media.src;
+        learningMediaImage.hidden = false;
+        return;
+    }
+
+    learningMediaVideo.setAttribute("aria-label", module.media.alt);
+    learningMediaVideo.src = module.media.src;
+    learningMediaVideo.hidden = false;
+    learningMediaVideo.load();
+}
+
+function renderLearningFeedback(module, selectedAnswer, moveFocus = false) {
+    const correctOption = module.quiz.options.find(
+        (option) => option.value === module.quiz.correctAnswer,
+    );
+    const isCorrect = selectedAnswer === module.quiz.correctAnswer;
+
+    learningFeedbackResult.textContent = isCorrect ? "Correct" : "Incorrect";
+    learningCorrectAnswer.textContent = `Correct answer: ${correctOption.label}`;
+    learningExplanation.textContent = module.quiz.explanation;
+    learningFeedback.classList.toggle("is-incorrect", !isCorrect);
+    learningFeedback.hidden = false;
+
+    if (moveFocus) {
+        learningFeedback.focus();
+    }
+}
+
+function renderLearningQuiz(module, moduleIndex) {
+    learningQuizControls.replaceChildren();
+    learningQuizError.hidden = true;
+    learningFeedback.hidden = true;
+    learningCheckAnswer.hidden = true;
+    learningQuizSubmitted = false;
+
+    if (!module.quiz) {
+        learningQuiz.hidden = true;
+        learningContinue.disabled = false;
+        return;
+    }
+
+    learningQuiz.hidden = false;
+    const selectedAnswer =
+        participantSession.learning.selectedQuizAnswers[module.id];
+    const hasSubmittedAnswer =
+        typeof selectedAnswer === "string" &&
+        module.quiz.options.some((option) => option.value === selectedAnswer);
+    const fieldset = createElement("fieldset", "learning-question");
+    const legend = createElement(
+        "legend",
+        "",
+        module.quiz.question,
+    );
+    const choices = createElement("div", "choice-list");
+
+    fieldset.setAttribute(
+        "aria-describedby",
+        "learning-quiz-error learning-feedback",
+    );
+
+    module.quiz.options.forEach((option, optionIndex) => {
+        const input = document.createElement("input");
+        const label = createElement("label", "choice-option");
+
+        input.id = `learning-quiz-${moduleIndex}-${optionIndex}`;
+        input.name = "learning-quiz-answer";
+        input.type = "radio";
+        input.value = option.value;
+        input.required = true;
+        input.checked = hasSubmittedAnswer && option.value === selectedAnswer;
+        input.disabled = hasSubmittedAnswer;
+        input.setAttribute(
+            "aria-describedby",
+            "learning-quiz-error learning-feedback",
+        );
+
+        label.htmlFor = input.id;
+        label.append(input, createElement("span", "", option.label));
+        choices.append(label);
+    });
+
+    fieldset.append(legend, choices);
+    learningQuizControls.append(fieldset);
+    learningQuizSubmitted = hasSubmittedAnswer;
+    learningCheckAnswer.hidden = hasSubmittedAnswer;
+    learningContinue.disabled = !hasSubmittedAnswer;
+
+    if (hasSubmittedAnswer) {
+        renderLearningFeedback(module, selectedAnswer);
+    }
+}
+
+function renderLearningStage(moveFocus = false) {
+    if (!learningContentReady) {
+        learningStageContent.hidden = true;
+        return;
+    }
+
+    if (!participantSession.participantId) {
+        learningStageContent.hidden = true;
+        learningConfigStatus.textContent =
+            "The learning session has not started. Complete the welcome stage before continuing.";
+        learningConfigStatus.hidden = false;
+        learningConfigStatus.classList.add("is-error");
+        return;
+    }
+
+    const moduleIndex = getCurrentLearningModuleIndex();
+    const module = learningModules[moduleIndex];
+
+    if (!module) {
+        setLearningUnavailable(
+            "Learning content is not configured. The learning stage is unavailable until the research team provides modules.",
+            true,
+        );
+        return;
+    }
+
+    learningConfigStatus.hidden = true;
+    learningConfigStatus.classList.remove("is-error");
+    learningStageContent.hidden = false;
+
+    learningModuleProgress.textContent = `Module ${moduleIndex + 1} of ${learningModules.length}`;
+    learningModuleProgressTrack.setAttribute(
+        "aria-valuemax",
+        String(learningModules.length),
+    );
+    learningModuleProgressTrack.setAttribute(
+        "aria-valuenow",
+        String(moduleIndex + 1),
+    );
+    learningModuleProgressTrack.setAttribute(
+        "aria-valuetext",
+        `Module ${moduleIndex + 1} of ${learningModules.length}`,
+    );
+    learningModuleProgressFill.style.width = `${
+        ((moduleIndex + 1) / learningModules.length) * 100
+    }%`;
+
+    learningModuleTitle.textContent = module.title;
+    learningModuleContent.replaceChildren(
+        ...module.content.map((paragraph) =>
+            createElement("p", "", paragraph),
+        ),
+    );
+    renderLearningMedia(module);
+    renderLearningQuiz(module, moduleIndex);
+
+    learningContinue.textContent =
+        moduleIndex === learningModules.length - 1
+            ? "Continue to Post-Assessment"
+            : "Continue";
+
+    if (moveFocus) {
+        learningModuleTitle.focus();
+    }
+}
+
+function handleLearningCheckAnswer() {
+    const module = learningModules[getCurrentLearningModuleIndex()];
+
+    if (
+        !learningContentReady ||
+        stages[currentStageIndex].id !== "learning" ||
+        !module?.quiz ||
+        learningQuizSubmitted
+    ) {
+        return;
+    }
+
+    const fieldset = learningQuizControls.querySelector(
+        ".learning-question",
+    );
+    const selectedInput = learningQuizControls.querySelector(
+        'input[name="learning-quiz-answer"]:checked',
+    );
+
+    if (!selectedInput) {
+        learningQuizError.hidden = false;
+        fieldset.setAttribute("aria-invalid", "true");
+        fieldset.querySelectorAll("input").forEach((input) => {
+            input.setAttribute("aria-invalid", "true");
+        });
+        fieldset.querySelector("input").focus();
+        return;
+    }
+
+    participantSession.learning.selectedQuizAnswers[module.id] =
+        selectedInput.value;
+    learningQuizSubmitted = true;
+    learningQuizError.hidden = true;
+    fieldset.removeAttribute("aria-invalid");
+    fieldset.querySelectorAll("input").forEach((input) => {
+        input.removeAttribute("aria-invalid");
+        input.disabled = true;
+    });
+    learningCheckAnswer.hidden = true;
+    learningContinue.disabled = false;
+    renderLearningFeedback(module, selectedInput.value, true);
+}
+
+function handleLearningContinue() {
+    if (
+        !learningContentReady ||
+        stages[currentStageIndex].id !== "learning"
+    ) {
+        return;
+    }
+
+    const module = learningModules[getCurrentLearningModuleIndex()];
+    const hasAnsweredQuiz =
+        !module?.quiz ||
+        Object.prototype.hasOwnProperty.call(
+            participantSession.learning.selectedQuizAnswers,
+            module.id,
+        );
+
+    if (!module || !hasAnsweredQuiz) {
+        return;
+    }
+
+    if (
+        !participantSession.learning.completedModuleIds.includes(module.id)
+    ) {
+        participantSession.learning.completedModuleIds.push(module.id);
+    }
+
+    const allModulesCompleted = learningModules.every((learningModule) =>
+        participantSession.learning.completedModuleIds.includes(
+            learningModule.id,
+        ),
+    );
+
+    if (allModulesCompleted) {
+        participantSession.learning.isComplete = true;
+        showStage(currentStageIndex + 1);
+        return;
+    }
+
+    renderLearningStage(true);
+}
+
 function generateParticipantId() {
     return crypto.randomUUID();
 }
@@ -1227,15 +1734,7 @@ function handleDemographicsSubmit(event) {
 }
 
 document.addEventListener("click", (event) => {
-    const nextButton = event.target.closest("[data-next-stage]");
     const previousButton = event.target.closest("[data-previous-stage]");
-
-    if (nextButton && currentStageIndex < stages.length - 1) {
-        if (getAssessmentMode()) {
-            return;
-        }
-        showStage(currentStageIndex + 1);
-    }
 
     if (previousButton && currentStageIndex > 0) {
         showStage(currentStageIndex - 1);
@@ -1281,6 +1780,33 @@ assessmentForm.addEventListener("change", (event) => {
     }
 });
 
+learningCheckAnswer.addEventListener("click", handleLearningCheckAnswer);
+learningContinue.addEventListener("click", handleLearningContinue);
+learningQuizControls.addEventListener("change", (event) => {
+    if (!event.target.matches('input[name="learning-quiz-answer"]')) {
+        return;
+    }
+
+    const fieldset = event.target.closest(".learning-question");
+    learningQuizError.hidden = true;
+    fieldset.removeAttribute("aria-invalid");
+    fieldset.querySelectorAll("input").forEach((input) => {
+        input.removeAttribute("aria-invalid");
+    });
+});
+
+learningMediaImage.addEventListener("error", () => {
+    if (!learningMediaImage.hidden) {
+        learningMediaStatus.hidden = false;
+    }
+});
+
+learningMediaVideo.addEventListener("error", () => {
+    if (!learningMediaVideo.hidden) {
+        learningMediaStatus.hidden = false;
+    }
+});
+
 assessmentVideo.addEventListener("loadedmetadata", () => {
     if (assessmentVideo.videoWidth && assessmentVideo.videoHeight) {
         assessmentVideo.style.aspectRatio = `${assessmentVideo.videoWidth} / ${assessmentVideo.videoHeight}`;
@@ -1321,3 +1847,4 @@ async function loadDemographics() {
 showStage(0, false);
 loadDemographics();
 loadAssessmentContent();
+loadLearningContent();

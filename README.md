@@ -6,8 +6,9 @@ improve people's ability to recognize political deepfakes.
 
 The repository currently contains the application interface, stage navigation,
 the configurable demographic questionnaire and consent gate, and the reusable
-pre/post video assessment. Assessment scoring, educational content, and data
-export have not been implemented yet.
+pre/post video assessment, plus the JSON-driven interactive learning stage.
+Assessment scoring, results analysis, and data export have not been implemented
+yet.
 
 ## Technology stack
 
@@ -38,6 +39,8 @@ deepfake-detective/
 │   ├── ex2.webm
 │   ├── ex3.webm
 │   └── ex4.webm
+├── tests/
+│   └── phase5-learning-check.mjs
 ├── .gitignore
 └── README.md
 ```
@@ -47,6 +50,7 @@ deepfake-detective/
 - `js/` contains the vanilla JavaScript application code.
 - `data/` contains JSON content loaded by the application.
 - `media/` contains the local videos used by the assessment.
+- `tests/` contains browser-level checks that use local Chrome.
 
 ## Run locally
 
@@ -83,25 +87,28 @@ conditions:
 Each assessment shows one configured video at a time. A submitted answer is
 stored in the in-memory participant session and the assessment advances only
 after all required responses are valid. The last pre-assessment video moves to
-the Learning stage. Because Learning is not implemented, that screen contains
-clearly labeled development scaffolding that opens the post-assessment. The
-last post-assessment video moves to Results.
+the Learning stage. Learning shows one module at a time in the order configured
+in `data/lessons.json`. A configured quiz must be checked before a participant
+can continue. The final module opens the post-assessment, and the last
+post-assessment video moves to Results.
 
 Participant state is held in the existing `participantSession` object in
 `js/app.js`. It includes the participant ID, consent and demographic responses,
 the assigned condition and video sets, assessment progress by stage, and the
-submitted assessment answers. Nothing is persisted to localStorage or exported
-yet.
+submitted assessment answers. Learning state records completed module IDs,
+checked quiz answers, and whether all modules are complete. Nothing is persisted
+to localStorage or exported yet.
 
 ## Research content
 
 The assessment and video files currently contain temporary test content. They
 must be replaced or reviewed before they are used for research conclusions. The
 temporary `real`/`fake` labels do not establish the actual authenticity of the
-videos. The lesson content remains unconfigured.
+videos. The lesson file contains two short placeholder modules and must be
+replaced with approved educational content.
 
 The application shows an unavailable/configuration message instead of
-fabricating assessment content when content files are empty or invalid.
+fabricating content when assessment or lesson files are empty or invalid.
 
 `data/demographics.json` contains temporary example demographic questions and a
 short consent statement. These will be replaced with final research content.
@@ -129,6 +136,47 @@ short consent statement. These will be replaced with final research content.
 omitted for `text` and `number` questions. An empty consent statement or an
 empty question array leaves participation disabled. Optional inclusive `min`
 and `max` bounds can be added to `number` questions.
+
+### Learning configuration
+
+`data/lessons.json` is an array. Array order defines the module sequence.
+`media` and `quiz` are optional for each module.
+
+```json
+[
+    {
+        "id": "unique_module_id",
+        "title": "Module title",
+        "content": [
+            "First approved text paragraph.",
+            "Second approved text paragraph."
+        ],
+        "media": {
+            "type": "image | video",
+            "src": "media/example.webm",
+            "alt": "Accessible description of the media"
+        },
+        "quiz": {
+            "question": "Single-choice question text",
+            "options": [
+                { "value": "option_a", "label": "First answer" },
+                { "value": "option_b", "label": "Second answer" }
+            ],
+            "correctAnswer": "option_a",
+            "explanation": "Explanation shown after the answer is checked."
+        }
+    }
+]
+```
+
+- Module IDs must be unique, and `content` must contain at least one non-empty
+  paragraph.
+- Image and video media require `type`, `src`, and `alt`. Videos must use a local
+  file path. The configured source aspect ratio is preserved.
+- Quiz options require at least two unique `value` fields. `correctAnswer` must
+  match one option value.
+- An empty or invalid module list shows a configuration message and leaves
+  Learning incomplete and blocked.
 
 ### Video configuration
 
@@ -210,3 +258,16 @@ the required 0–100 percentage range. Detection clues use checkboxes and allow
 multiple selections. Each submitted answer records the assessment stage, video
 ID, 1-based video position, `answer` value, confidence percentage, and configured
 clue values.
+
+## Browser checks
+
+With Google Chrome installed, run:
+
+```bash
+node tests/phase5-learning-check.mjs
+```
+
+The script starts temporary local server and Chrome processes, completes the
+pre-assessment, and verifies module order, quiz blocking and feedback, session
+state, media rendering, invalid configurations, responsive widths, and browser
+console errors.

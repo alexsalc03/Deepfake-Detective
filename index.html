@@ -289,70 +289,109 @@
                     Interactive Learning
                 </h2>
 
-                <div class="learning-layout">
-                    <section class="module-title-card" aria-labelledby="module-title-heading">
-                        <h3 id="module-title-heading">Module Title</h3>
-                        <p class="placeholder-note" aria-label="Placeholder for module title">
-                            <span class="placeholder-label">Module title placeholder</span>
-                            The configured module title will appear here.
-                        </p>
-                    </section>
-
-                    <section class="module-progress" aria-labelledby="module-progress-heading">
-                        <h3 id="module-progress-heading" class="visually-hidden">
-                            Module Progress
-                        </h3>
-                        <div
-                            class="track-placeholder"
-                            aria-label="Placeholder for module progress indicator"
-                        >
-                            <span aria-hidden="true"></span>
-                        </div>
-                        <p class="helper-text">Module progress indicator placeholder</p>
-                    </section>
-
-                    <section
-                        class="content-section learning-content"
-                        aria-labelledby="educational-content-heading"
-                    >
-                        <div class="card-topline">
-                            <h3 id="educational-content-heading">Educational Content</h3>
-                        </div>
-                        <p class="placeholder-note" aria-label="Placeholder for educational content">
-                            <span class="placeholder-label">Educational content</span>
-                            Lesson content will be provided by the research team and
-                            loaded from the application's content files.
-                        </p>
-                    </section>
-
-                    <section
-                        class="content-section learning-exercise-card"
-                        aria-labelledby="exercise-heading"
-                    >
-                        <div class="card-topline">
-                            <h3 id="exercise-heading">Interactive Exercise</h3>
-                        </div>
-                        <p class="placeholder-note" aria-label="Placeholder for interactive exercise">
-                            <span class="placeholder-label">Exercise placeholder</span>
-                            The interactive learning exercise will appear here.
-                        </p>
-                    </section>
-                </div>
-
-                <p class="development-note">
-                    <strong>Development scaffolding:</strong> the learning intervention is
-                    not implemented. This preview skips directly to the post-assessment for
-                    testing.
+                <p
+                    id="learning-config-status"
+                    class="configuration-status"
+                    role="status"
+                    aria-live="polite"
+                >
+                    Loading learning modules.
                 </p>
 
-                <div class="screen-actions screen-actions-split">
-                    <button class="button button-secondary" type="button" data-previous-stage>
-                        <span class="button-back-icon" aria-hidden="true">&larr;</span>
-                        Back
-                    </button>
-                    <button class="button button-primary" type="button" data-next-stage>
-                        Continue to Post-Assessment (development preview)
-                    </button>
+                <div id="learning-stage-content" class="learning-layout" hidden>
+                    <div class="learning-progress">
+                        <p
+                            id="learning-module-progress"
+                            class="learning-module-count"
+                            aria-live="polite"
+                        >
+                            Module 1 of 1
+                        </p>
+                        <div
+                            id="learning-module-progress-track"
+                            class="learning-progress-track"
+                            role="progressbar"
+                            aria-label="Learning module progress"
+                            aria-valuemin="1"
+                            aria-valuemax="1"
+                            aria-valuenow="1"
+                        >
+                            <span id="learning-module-progress-fill"></span>
+                        </div>
+                    </div>
+
+                    <article class="learning-module" aria-labelledby="learning-module-title">
+                        <h3 id="learning-module-title" tabindex="-1">Learning Module</h3>
+                        <div id="learning-module-content" class="learning-module-content"></div>
+
+                        <figure id="learning-media" class="learning-media" hidden>
+                            <img id="learning-media-image" alt="" hidden>
+                            <video
+                                id="learning-media-video"
+                                controls
+                                playsinline
+                                preload="metadata"
+                                aria-label="Learning module video"
+                                hidden
+                            ></video>
+                            <p
+                                id="learning-media-status"
+                                class="video-status"
+                                role="alert"
+                                hidden
+                            >
+                                This learning media could not be loaded.
+                            </p>
+                        </figure>
+
+                        <section
+                            id="learning-quiz"
+                            class="learning-quiz"
+                            aria-label="Module question"
+                            hidden
+                        >
+                            <div id="learning-quiz-controls"></div>
+                            <p
+                                id="learning-quiz-error"
+                                class="field-error"
+                                role="alert"
+                                hidden
+                            >
+                                Select an answer before checking.
+                            </p>
+                            <div
+                                id="learning-feedback"
+                                class="learning-feedback"
+                                role="status"
+                                aria-live="polite"
+                                aria-atomic="true"
+                                tabindex="-1"
+                                hidden
+                            >
+                                <p id="learning-feedback-result" class="learning-feedback-result"></p>
+                                <p id="learning-correct-answer"></p>
+                                <p id="learning-explanation"></p>
+                            </div>
+                        </section>
+
+                        <div class="screen-actions learning-actions">
+                            <button
+                                id="learning-check-answer"
+                                class="button button-primary"
+                                type="button"
+                                hidden
+                            >
+                                Check Answer
+                            </button>
+                            <button
+                                id="learning-continue"
+                                class="button button-primary"
+                                type="button"
+                            >
+                                Continue
+                            </button>
+                        </div>
+                    </article>
                 </div>
             </section>
 

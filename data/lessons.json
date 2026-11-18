@@ -1,1 +1,36 @@
-[]
+[
+    {
+        "id": "placeholder-module-1",
+        "title": "Placeholder Module 1",
+        "content": [
+            "This is placeholder text for testing the learning module layout.",
+            "The approved educational content will replace this example."
+        ]
+    },
+    {
+        "id": "placeholder-module-2",
+        "title": "Placeholder Module 2",
+        "content": [
+            "This placeholder paragraph demonstrates a module with an optional question."
+        ],
+        "quiz": {
+            "question": "Which answer is marked correct in this placeholder question?",
+            "options": [
+                {
+                    "value": "a",
+                    "label": "Placeholder answer A"
+                },
+                {
+                    "value": "b",
+                    "label": "Placeholder answer B"
+                },
+                {
+                    "value": "c",
+                    "label": "Placeholder answer C"
+                }
+            ],
+            "correctAnswer": "a",
+            "explanation": "This placeholder explanation appears after the answer is checked."
+        }
+    }
+]
