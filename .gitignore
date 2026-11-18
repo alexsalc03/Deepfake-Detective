@@ -1,0 +1,21 @@
+# Editor-specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Environment files
+.env
+.env.*
+
+# Local experiment results
+experiments/
+results/
+local-results/
+logs/
