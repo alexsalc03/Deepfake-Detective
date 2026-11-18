@@ -5,8 +5,9 @@ university research project. It will study whether interactive learning can
 improve people's ability to recognize political deepfakes.
 
 The repository currently contains the application interface, stage navigation,
-the configurable demographic questionnaire and consent gate. Assessment
-scoring and data export have not been implemented yet.
+the configurable demographic questionnaire and consent gate, and the reusable
+pre/post video assessment. Assessment scoring, educational content, and data
+export have not been implemented yet.
 
 ## Technology stack
 
@@ -33,7 +34,10 @@ deepfake-detective/
 │   ├── videos.json
 │   └── lessons.json
 ├── media/
-│   └── .gitkeep
+│   ├── ex.webm
+│   ├── ex2.webm
+│   ├── ex3.webm
+│   └── ex4.webm
 ├── .gitignore
 └── README.md
 ```
@@ -42,7 +46,7 @@ deepfake-detective/
 - `css/` contains the application styles.
 - `js/` contains the vanilla JavaScript application code.
 - `data/` contains JSON content loaded by the application.
-- `media/` will hold the videos and other media used in the study.
+- `media/` contains the local videos used by the assessment.
 
 ## Run locally
 
@@ -68,13 +72,36 @@ files consistently.
 
 The welcome stage loads the demographic questionnaire and consent statement
 from `data/demographics.json`. Required answers and explicit consent must be
-provided before participation can continue to the pre-assessment. The later
-stage controls remain temporary preview navigation.
+provided before participation can continue to the pre-assessment.
+
+Starting the experiment assigns the participant to one of two stable
+conditions:
+
+- Condition 1: pre-assessment uses set A; post-assessment uses set B
+- Condition 2: pre-assessment uses set B; post-assessment uses set A
+
+Each assessment shows one configured video at a time. A submitted answer is
+stored in the in-memory participant session and the assessment advances only
+after all required responses are valid. The last pre-assessment video moves to
+the Learning stage. Because Learning is not implemented, that screen contains
+clearly labeled development scaffolding that opens the post-assessment. The
+last post-assessment video moves to Results.
+
+Participant state is held in the existing `participantSession` object in
+`js/app.js`. It includes the participant ID, consent and demographic responses,
+the assigned condition and video sets, assessment progress by stage, and the
+submitted assessment answers. Nothing is persisted to localStorage or exported
+yet.
 
 ## Research content
 
-The assessment, video, and lesson content files do not yet contain research
-materials. They will be provided separately by team members.
+The assessment and video files currently contain temporary test content. They
+must be replaced or reviewed before they are used for research conclusions. The
+temporary `real`/`fake` labels do not establish the actual authenticity of the
+videos. The lesson content remains unconfigured.
+
+The application shows an unavailable/configuration message instead of
+fabricating assessment content when content files are empty or invalid.
 
 `data/demographics.json` contains temporary example demographic questions and a
 short consent statement. These will be replaced with final research content.
@@ -102,3 +129,84 @@ short consent statement. These will be replaced with final research content.
 omitted for `text` and `number` questions. An empty consent statement or an
 empty question array leaves participation disabled. Optional inclusive `min`
 and `max` bounds can be added to `number` questions.
+
+### Video configuration
+
+`data/videos.json` is an array. Array order defines the fixed order of videos
+within each set. IDs and local file paths must be unique across the file so a
+video cannot appear in both assessments.
+
+```json
+[
+    {
+        "id": "unique_video_id",
+        "file": "media/video-file.webm",
+        "label": "real",
+        "set": "A",
+        "source": ""
+    }
+]
+```
+
+- `file` must be a local path, not an external URL.
+- `label` must be `real` or `fake`.
+- `set` must be `A` or `B`, and both sets need at least one video.
+- `source` and `label` are available in the configuration but are not displayed
+  during the assessment.
+- `source` may be an empty string while temporary test content is in use.
+
+The current temporary video mapping is:
+
+- Set A: `ex1` → `media/ex.webm`, `ex2` → `media/ex2.webm`
+- Set B: `ex3` → `media/ex3.webm`, `ex4` → `media/ex4.webm`
+
+The first file is currently named `ex.webm`; the configured video ID remains
+`ex1`.
+
+### Assessment configuration
+
+`data/assessment.json` contains exactly one classification, confidence, and
+detection-clue question. Question labels and option text can be changed without
+editing JavaScript. All three questions must set `required` to `true`.
+
+```json
+{
+    "questions": [
+        {
+            "id": "classification",
+            "type": "classification",
+            "required": true,
+            "label": "Question text supplied by the research team",
+            "options": [
+                { "value": "real", "label": "Authentic" },
+                { "value": "fake", "label": "AI-generated" }
+            ]
+        },
+        {
+            "id": "confidence",
+            "type": "confidence",
+            "required": true,
+            "label": "Question text supplied by the research team",
+            "min": 0,
+            "max": 100,
+            "step": 1
+        },
+        {
+            "id": "clues",
+            "type": "clues",
+            "required": true,
+            "label": "Question text supplied by the research team",
+            "options": [
+                { "value": "clue_id_one", "label": "Clue option one" },
+                { "value": "clue_id_two", "label": "Clue option two" }
+            ]
+        }
+    ]
+}
+```
+
+Classification must contain the values `real` and `fake`. Confidence must use
+the required 0–100 percentage range. Detection clues use checkboxes and allow
+multiple selections. Each submitted answer records the assessment stage, video
+ID, 1-based video position, `answer` value, confidence percentage, and configured
+clue values.

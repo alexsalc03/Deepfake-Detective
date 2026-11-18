@@ -184,79 +184,97 @@
                     Pre-Assessment
                 </h2>
 
-                <div class="assessment-layout">
-                    <section class="video-section" aria-labelledby="video-heading">
-                        <div class="card-topline">
-                            <h3 id="video-heading">Video Player</h3>
-                        </div>
-                        <div class="video-placeholder" aria-label="Placeholder for video player">
-                            <span class="play-placeholder" aria-hidden="true"></span>
-                            <p>Video player placeholder</p>
-                            <span>Video content will be loaded in a later phase.</span>
-                        </div>
-                        <div class="video-progress">
-                            <h3 id="video-progress-heading" class="visually-hidden">
-                                Video Progress
-                            </h3>
-                            <div
-                                class="track-placeholder"
-                                aria-label="Placeholder for video progress indicator"
+                <form id="assessment-form" class="assessment-form" novalidate>
+                    <p
+                        id="assessment-config-status"
+                        class="configuration-status"
+                        role="status"
+                        aria-live="polite"
+                    >
+                        Loading assessment content.
+                    </p>
+
+                    <div id="assessment-content" class="assessment-layout" hidden>
+                        <section class="video-section" aria-labelledby="video-heading">
+                            <div class="card-topline">
+                                <h3 id="video-heading">Video Assessment</h3>
+                                <p
+                                    class="assessment-position"
+                                    data-video-position
+                                    aria-live="polite"
+                                >
+                                    Video 1 of 1
+                                </p>
+                            </div>
+                            <div class="assessment-video-frame">
+                                <video
+                                    id="assessment-video"
+                                    class="assessment-video"
+                                    controls
+                                    playsinline
+                                    preload="metadata"
+                                    aria-label="Video to classify"
+                                ></video>
+                            </div>
+                            <p
+                                id="assessment-video-status"
+                                class="video-status"
+                                role="alert"
+                                hidden
                             >
-                                <span aria-hidden="true"></span>
-                            </div>
-                            <p class="helper-text">Video progress indicator placeholder</p>
-                        </div>
-                    </section>
-
-                    <div class="assessment-details">
-                        <section
-                            class="assessment-question"
-                            aria-labelledby="classification-heading"
-                        >
-                            <h3 id="classification-heading">Classification Question</h3>
-                            <p>The classification question and response options will appear here.</p>
-                            <div
-                                class="classification-options"
-                                role="group"
-                                aria-label="Placeholder for neutral classification buttons"
-                            >
-                                <span class="neutral-button">Classification option</span>
-                                <span class="neutral-button">Classification option</span>
+                                This video could not be loaded. Check the video file and
+                                supported format.
+                            </p>
+                            <div class="video-progress">
+                                <div
+                                    id="assessment-progress-track"
+                                    class="assessment-progress-track"
+                                    role="progressbar"
+                                    aria-label="Assessment video progress"
+                                    aria-valuemin="1"
+                                    aria-valuemax="1"
+                                    aria-valuenow="1"
+                                >
+                                    <span id="assessment-progress-fill"></span>
+                                </div>
                             </div>
                         </section>
 
-                        <section class="assessment-question" aria-labelledby="confidence-heading">
-                            <h3 id="confidence-heading">Confidence Input</h3>
-                            <p>The confidence rating control will appear here.</p>
-                            <div class="range-placeholder" aria-hidden="true">
-                                <span>Low</span>
-                                <span class="range-track"><span></span></span>
-                                <span>High</span>
-                            </div>
-                        </section>
-
-                        <section
-                            class="assessment-question"
-                            aria-labelledby="clues-heading"
-                            data-assessment-clues
-                            hidden
-                        >
-                            <h3 id="clues-heading">Detection Clues</h3>
-                            <p>Detection clue options will appear here.</p>
-                            <p class="inline-note">Clues placeholder</p>
-                        </section>
+                        <div
+                            id="assessment-questions"
+                            class="assessment-details"
+                            aria-label="Video assessment questions"
+                        ></div>
                     </div>
-                </div>
 
-                <div class="screen-actions screen-actions-split">
-                    <button class="button button-secondary" type="button" data-previous-stage>
-                        <span class="button-back-icon" aria-hidden="true">&larr;</span>
-                        Back
-                    </button>
-                    <button class="button button-primary" type="button" data-next-stage>
-                        <span data-assessment-next-label>Continue to Learning</span>
-                    </button>
-                </div>
+                    <p
+                        id="assessment-error-summary"
+                        class="form-error-summary"
+                        role="alert"
+                        hidden
+                    >
+                        Please answer each question before continuing.
+                    </p>
+
+                    <div class="screen-actions screen-actions-split">
+                        <button
+                            class="button button-secondary"
+                            type="button"
+                            data-previous-stage
+                        >
+                            <span class="button-back-icon" aria-hidden="true">&larr;</span>
+                            Back
+                        </button>
+                        <button
+                            id="assessment-submit"
+                            class="button button-primary"
+                            type="submit"
+                            disabled
+                        >
+                            <span data-assessment-next-label>Submit and Continue</span>
+                        </button>
+                    </div>
+                </form>
             </section>
 
             <section
@@ -321,13 +339,19 @@
                     </section>
                 </div>
 
+                <p class="development-note">
+                    <strong>Development scaffolding:</strong> the learning intervention is
+                    not implemented. This preview skips directly to the post-assessment for
+                    testing.
+                </p>
+
                 <div class="screen-actions screen-actions-split">
                     <button class="button button-secondary" type="button" data-previous-stage>
                         <span class="button-back-icon" aria-hidden="true">&larr;</span>
                         Back
                     </button>
                     <button class="button button-primary" type="button" data-next-stage>
-                        Continue to Post-Assessment
+                        Continue to Post-Assessment (development preview)
                     </button>
                 </div>
             </section>

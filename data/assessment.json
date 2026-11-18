@@ -1,1 +1,61 @@
-[]
+{
+    "questions": [
+        {
+            "id": "classification",
+            "type": "classification",
+            "required": true,
+            "label": "Is this video authentic or AI-generated?",
+            "options": [
+                {
+                    "value": "real",
+                    "label": "Authentic"
+                },
+                {
+                    "value": "fake",
+                    "label": "AI-generated"
+                }
+            ]
+        },
+        {
+            "id": "confidence",
+            "type": "confidence",
+            "required": true,
+            "label": "How confident are you in your answer?",
+            "min": 0,
+            "max": 100,
+            "step": 1
+        },
+        {
+            "id": "clues",
+            "type": "clues",
+            "required": true,
+            "label": "What influenced your decision?",
+            "options": [
+                {
+                    "value": "facial_movements",
+                    "label": "Facial movements"
+                },
+                {
+                    "value": "lip_sync",
+                    "label": "Lip synchronization"
+                },
+                {
+                    "value": "voice_audio",
+                    "label": "Voice or audio quality"
+                },
+                {
+                    "value": "lighting_visuals",
+                    "label": "Lighting and visual details"
+                },
+                {
+                    "value": "context_credibility",
+                    "label": "Context or source credibility"
+                },
+                {
+                    "value": "general_impression",
+                    "label": "General impression"
+                }
+            ]
+        }
+    ]
+}

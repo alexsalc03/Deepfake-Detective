@@ -1,1 +1,30 @@
-[]
+[
+    {
+        "id": "ex1",
+        "file": "media/ex.webm",
+        "label": "real",
+        "set": "A",
+        "source": ""
+    },
+    {
+        "id": "ex2",
+        "file": "media/ex2.webm",
+        "label": "fake",
+        "set": "A",
+        "source": ""
+    },
+    {
+        "id": "ex3",
+        "file": "media/ex3.webm",
+        "label": "fake",
+        "set": "B",
+        "source": ""
+    },
+    {
+        "id": "ex4",
+        "file": "media/ex4.webm",
+        "label": "real",
+        "set": "B",
+        "source": ""
+    }
+]
