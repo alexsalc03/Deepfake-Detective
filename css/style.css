@@ -1098,6 +1098,13 @@ fieldset.form-question {
     line-height: 1.55;
 }
 
+.submission-actions {
+    display: flex;
+    flex-shrink: 0;
+    gap: 16px;
+    align-items: center;
+}
+
 .app-footer {
     margin-top: 44px;
     padding-top: 16px;
@@ -1264,6 +1271,12 @@ fieldset.form-question {
     .submission-section {
         align-items: stretch;
         flex-direction: column;
+    }
+
+    .submission-actions {
+        align-items: stretch;
+        flex-direction: column-reverse;
+        gap: 10px;
     }
 
     .submission-section .button {

@@ -6,9 +6,8 @@ improve people's ability to recognize political deepfakes.
 
 The repository currently contains the application interface, stage navigation,
 the configurable demographic questionnaire and consent gate, the reusable
-pre/post video assessment, the JSON-driven interactive learning stage, and the
-pre/post Results comparison. Automatic result submission has not been
-implemented yet.
+pre/post video assessment, the JSON-driven interactive learning stage, the
+pre/post Results comparison, and verified result submission to Google Sheets.
 
 ## Technology stack
 
@@ -17,8 +16,9 @@ implemented yet.
 - Vanilla JavaScript
 - JSON files for application content
 
-The project uses no frontend frameworks, backend, database, external
-dependencies, or build tools.
+The project uses no frontend frameworks, repository-hosted backend, database,
+package dependencies, or build tools. Result submission uses a configured
+external Google Apps Script Web App.
 
 ## Project structure
 
@@ -41,7 +41,8 @@ deepfake-detective/
 │   └── ex4.webm
 ├── tests/
 │   ├── phase5-learning-check.mjs
-│   └── phase6-results-check.mjs
+│   ├── phase6-results-check.mjs
+│   └── phase7-live-submission-check.mjs
 ├── .gitignore
 └── README.md
 ```
@@ -98,14 +99,18 @@ Participant state is held in the existing `participantSession` object in
 the assigned condition and video sets, assessment progress by stage, and the
 submitted assessment answers. Learning state records completed module IDs,
 checked quiz answers, and whether all modules are complete. Nothing is persisted
-to localStorage or submitted over the network yet.
+to localStorage; completed results are sent only when the participant selects
+Submit Results.
 
 The Results stage calculates correct classifications, accuracy, and average
 confidence from the in-memory assessment answers and the labels in
-`data/videos.json`. It also prepares a JSON-serializable submission payload with
-the participant, demographic, condition, assessment, learning, and calculated
-performance data. The submission control remains disabled until the network
-workflow is implemented in Phase 7.
+`data/videos.json`. It prepares a JSON-serializable submission payload with the
+participant, demographic, condition, assessment, learning, and calculated
+performance data. Submit Results sends that payload to the configured Google
+Apps Script Web App and then verifies the participant ID through its JSONP GET
+endpoint. The interface reports success only after positive verification.
+Failed or unconfirmed requests keep the participant session in memory and can
+be retried. New Participant remains unavailable until verification succeeds.
 
 ## Research content
 
@@ -279,3 +284,13 @@ node tests/phase6-results-check.mjs
 The scripts start temporary local server and Chrome processes. Together they
 verify the assessment and learning flow, result calculations, submission
 payload, complete session reset, responsive widths, and browser console errors.
+
+The live submission check is opt-in because it sends one synthetic result to
+the configured Google Sheet:
+
+```bash
+RUN_LIVE_SUBMISSION_TEST=1 node tests/phase7-live-submission-check.mjs
+```
+
+It verifies the production POST and JSONP confirmation flow without
+intentionally logging the synthetic participant ID or payload.

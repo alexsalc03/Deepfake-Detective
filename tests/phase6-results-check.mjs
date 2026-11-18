@@ -316,7 +316,8 @@ async function run() {
                 difference: document.querySelector("#accuracy-difference").textContent.trim(),
                 confidenceComparison: document.querySelector("#confidence-comparison").textContent.trim(),
                 submitDisabled: document.querySelector("#submit-results").disabled,
-                resetExposed: document.querySelector("[data-reset-experiment]") !== null,
+                newParticipantDisabled: document.querySelector("#new-participant")?.disabled ?? null,
+                submissionStatusAriaLive: document.querySelector("#submission-status").getAttribute("aria-live"),
                 backExposed: document.querySelector("#results-screen [data-previous-stage]") !== null
             })
         `);
@@ -330,8 +331,9 @@ async function run() {
             postConfidence: "90%",
             difference: "+50 percentage points",
             confidenceComparison: "50% → 90%",
-            submitDisabled: true,
-            resetExposed: false,
+            submitDisabled: false,
+            newParticipantDisabled: true,
+            submissionStatusAriaLive: "polite",
             backExposed: false,
         });
 
@@ -458,14 +460,269 @@ async function run() {
         await captureViewport(client, "/tmp/phase6-results-mobile.png");
 
         const oldParticipantId = payload.participantId;
+        const submittingState = await client.evaluate(`
+            (() => {
+                window.__submissionTest = {
+                    fetchCalls: [],
+                    verificationRequests: [],
+                    verificationMode: "fail"
+                };
+                window.fetch = async (url, options) => {
+                    window.__submissionTest.fetchCalls.push({
+                        url: String(url),
+                        method: options?.method,
+                        mode: options?.mode,
+                        contentType: options?.headers?.["Content-Type"],
+                        body: options?.body
+                    });
+                    return { type: "opaque" };
+                };
+                const appendChild = document.head.appendChild.bind(document.head);
+                document.head.appendChild = (element) => {
+                    if (element.tagName !== "SCRIPT") {
+                        return appendChild(element);
+                    }
+
+                    const requestUrl = new URL(element.src);
+                    const callbackName = requestUrl.searchParams.get("callback");
+                    const verificationRequest = {
+                        participantId: requestUrl.searchParams.get("participantId"),
+                        callbackName,
+                        removed: false
+                    };
+                    window.__submissionTest.verificationRequests.push(
+                        verificationRequest,
+                    );
+                    element.remove = () => {
+                        verificationRequest.removed = true;
+                    };
+                    setTimeout(() => {
+                        if (window.__submissionTest.verificationMode === "success") {
+                            window[callbackName]?.({
+                                participantId: ${JSON.stringify(oldParticipantId)},
+                                saved: true
+                            });
+                        } else if (window.__submissionTest.verificationMode === "timeout") {
+                            return;
+                        } else if (window.__submissionTest.verificationRequests.length === 1) {
+                            window[callbackName]?.({
+                                participantId: "different-participant-id",
+                                saved: true
+                            });
+                        } else if (window.__submissionTest.verificationRequests.length === 2) {
+                            window[callbackName]?.({
+                                participantId: ${JSON.stringify(oldParticipantId)},
+                                saved: false
+                            });
+                        } else {
+                            element.onerror?.(new Event("error"));
+                        }
+                    }, 0);
+                    return element;
+                };
+
+                document.querySelector("#submit-results").click();
+                document.querySelector("#submit-results").click();
+                return {
+                    buttonText: document.querySelector("#submit-results").textContent.trim(),
+                    buttonDisabled: document.querySelector("#submit-results").disabled,
+                    status: document.querySelector("#submission-status").textContent.trim()
+                };
+            })()
+        `);
+        assert.deepEqual(submittingState, {
+            buttonText: "Submitting...",
+            buttonDisabled: true,
+            status: "Submitting your responses. Please wait.",
+        });
+        await waitFor(
+            client,
+            `document.querySelector("#submission-status").textContent.trim() === "We couldn't confirm that your responses were saved. Please try again."`,
+            "failed submission state",
+        );
+
+        const failedSubmission = await client.evaluate(`
+            (() => ({
+                fetchCalls: window.__submissionTest.fetchCalls,
+                verificationRequests: window.__submissionTest.verificationRequests,
+                callbacksRemoved: window.__submissionTest.verificationRequests.every(
+                    ({ callbackName }) => typeof window[callbackName] === "undefined"
+                ),
+                scriptsRemoved: window.__submissionTest.verificationRequests.every(
+                    ({ removed }) => removed
+                ),
+                participantId: participantSession.participantId,
+                assessmentAnswerCount: participantSession.assessmentAnswers.length,
+                submitDisabled: document.querySelector("#submit-results").disabled,
+                newParticipantDisabled: document.querySelector("#new-participant").disabled
+            }))()
+        `);
+        assert.equal(failedSubmission.fetchCalls.length, 1);
+        assert.deepEqual(failedSubmission.fetchCalls[0], {
+            url: "https://script.google.com/macros/s/AKfycbwdisKpuSpKqWfSp8NrXfl48oPQ3LTxofn6kJzF3KznLjaSqs3GwQFVqQceikYjMsqw2g/exec",
+            method: "POST",
+            mode: "no-cors",
+            contentType: "text/plain;charset=utf-8",
+            body: JSON.stringify(payload),
+        });
+        assert.equal(failedSubmission.verificationRequests.length, 3);
+        assert.equal(
+            failedSubmission.verificationRequests.every(
+                ({ participantId }) => participantId === oldParticipantId,
+            ),
+            true,
+        );
+        assert.equal(
+            new Set(
+                failedSubmission.verificationRequests.map(
+                    ({ callbackName }) => callbackName,
+                ),
+            ).size,
+            3,
+        );
+        assert.equal(failedSubmission.callbacksRemoved, true);
+        assert.equal(failedSubmission.scriptsRemoved, true);
+        assert.equal(failedSubmission.participantId, oldParticipantId);
+        assert.equal(failedSubmission.assessmentAnswerCount, 4);
+        assert.equal(failedSubmission.submitDisabled, false);
+        assert.equal(failedSubmission.newParticipantDisabled, true);
+
+        const timeoutCleanup = await client.evaluate(`
+            (async () => {
+                window.__submissionTest.verificationMode = "timeout";
+                const requestStartIndex = window.__submissionTest.verificationRequests.length;
+                let rejected = false;
+                try {
+                    await verifyParticipantSaved(${JSON.stringify(oldParticipantId)}, 20);
+                } catch {
+                    rejected = true;
+                }
+                const callbackName = window.__submissionTest.verificationRequests[
+                    requestStartIndex
+                ].callbackName;
+                return {
+                    rejected,
+                    callbackRemoved: typeof window[callbackName] === "undefined"
+                };
+            })()
+        `);
+        assert.deepEqual(timeoutCleanup, {
+            rejected: true,
+            callbackRemoved: true,
+        });
+
+        await client.evaluate(`
+            (() => {
+                window.__submissionTest.verificationMode = "success";
+                document.querySelector("#submit-results").click();
+                return true;
+            })()
+        `);
+        await waitFor(
+            client,
+            `document.querySelector("#submission-status").textContent.trim() === "Your responses have been saved successfully."`,
+            "successful verified submission state",
+        );
+        const successfulSubmission = await client.evaluate(`
+            ({
+                fetchCallCount: window.__submissionTest.fetchCalls.length,
+                submitHidden: document.querySelector("#submit-results").hidden,
+                submitDisabled: document.querySelector("#submit-results").disabled,
+                newParticipantDisabled: document.querySelector("#new-participant").disabled,
+                focusedElementId: document.activeElement.id
+            })
+        `);
+        assert.deepEqual(successfulSubmission, {
+            fetchCallCount: 1,
+            submitHidden: true,
+            submitDisabled: true,
+            newParticipantDisabled: false,
+            focusedElementId: "new-participant",
+        });
+
+        const boundedPost = await client.evaluate(`
+            (async () => {
+                let signalPresent = false;
+                let aborted = false;
+                window.fetch = (url, options) =>
+                    new Promise((resolve, reject) => {
+                        signalPresent = options?.signal instanceof AbortSignal;
+                        options?.signal?.addEventListener("abort", () => {
+                            aborted = true;
+                            reject(new DOMException("Aborted", "AbortError"));
+                        });
+                        setTimeout(
+                            () => reject(new TypeError("Synthetic fallback timeout")),
+                            100,
+                        );
+                    });
+                try {
+                    await postSubmission("{}", 20);
+                } catch {
+                    // The bounded request must reject after it is aborted.
+                }
+                return { signalPresent, aborted };
+            })()
+        `);
+        assert.deepEqual(boundedPost, {
+            signalPresent: true,
+            aborted: true,
+        });
+
+        const rejectedFetchSubmittingState = await client.evaluate(`
+            (() => {
+                resetSubmissionState();
+                window.__submissionTest.fetchCalls = [];
+                window.__submissionTest.verificationRequests = [];
+                window.__submissionTest.verificationMode = "success";
+                window.fetch = async (url, options) => {
+                    window.__submissionTest.fetchCalls.push({
+                        url: String(url),
+                        body: options?.body
+                    });
+                    throw new TypeError("Synthetic ambiguous network failure");
+                };
+                document.querySelector("#submit-results").click();
+                return {
+                    buttonText: document.querySelector("#submit-results").textContent.trim(),
+                    buttonDisabled: document.querySelector("#submit-results").disabled
+                };
+            })()
+        `);
+        assert.deepEqual(rejectedFetchSubmittingState, {
+            buttonText: "Submitting...",
+            buttonDisabled: true,
+        });
+        await waitFor(
+            client,
+            `document.querySelector("#submission-status").textContent.trim() === "Your responses have been saved successfully."`,
+            "verification after an ambiguous POST failure",
+        );
+        const rejectedFetchResult = await client.evaluate(`
+            ({
+                fetchCallCount: window.__submissionTest.fetchCalls.length,
+                verificationRequestCount: window.__submissionTest.verificationRequests.length,
+                newParticipantDisabled: document.querySelector("#new-participant").disabled
+            })
+        `);
+        assert.deepEqual(rejectedFetchResult, {
+            fetchCallCount: 1,
+            verificationRequestCount: 1,
+            newParticipantDisabled: false,
+        });
+
         const resetState = await client.evaluate(`
             (() => {
-                resetExperimentSession();
+                document.querySelector("#new-participant").click();
                 return {
                     stage: document.body.dataset.activeStage,
                     session: participantSession,
                     consentChecked: document.querySelector("#consent-checkbox").checked,
                     ageValue: document.querySelector("#demographic-age").value,
+                    submissionStatus: document.querySelector("#submission-status").textContent.trim(),
+                    submitText: document.querySelector("#submit-results").textContent.trim(),
+                    submitHidden: document.querySelector("#submit-results").hidden,
+                    newParticipantDisabled: document.querySelector("#new-participant").disabled,
                     oldParticipantId: ${JSON.stringify(oldParticipantId)}
                 };
             })()
@@ -488,6 +745,10 @@ async function run() {
         });
         assert.equal(resetState.consentChecked, false);
         assert.equal(resetState.ageValue, "");
+        assert.equal(resetState.submissionStatus, "Your results have not been submitted.");
+        assert.equal(resetState.submitText, "Submit Results");
+        assert.equal(resetState.submitHidden, false);
+        assert.equal(resetState.newParticipantDisabled, true);
         assert.equal(resetState.session.participantId === oldParticipantId, false);
 
         await completeDemographics(client);

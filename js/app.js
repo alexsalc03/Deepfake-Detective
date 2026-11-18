@@ -27,6 +27,13 @@ const stages = [
     },
 ];
 
+const submissionEndpoint =
+    "https://script.google.com/macros/s/AKfycbwdisKpuSpKqWfSp8NrXfl48oPQ3LTxofn6kJzF3KznLjaSqs3GwQFVqQceikYjMsqw2g/exec";
+const submissionVerificationAttempts = 3;
+const submissionVerificationDelayMilliseconds = 750;
+const submissionVerificationTimeoutMilliseconds = 4000;
+const submissionPostTimeoutMilliseconds = 10000;
+
 const screens = [...document.querySelectorAll("[data-screen]")];
 const progressSteps = [...document.querySelectorAll("[data-stage-id]")];
 const assessmentScreen = document.querySelector("#assessment-screen");
@@ -101,6 +108,9 @@ const postAccuracy = document.querySelector("#post-accuracy");
 const postConfidence = document.querySelector("#post-confidence");
 const accuracyDifference = document.querySelector("#accuracy-difference");
 const confidenceComparison = document.querySelector("#confidence-comparison");
+const submissionStatus = document.querySelector("#submission-status");
+const submitResultsButton = document.querySelector("#submit-results");
+const newParticipantButton = document.querySelector("#new-participant");
 const supportedQuestionTypes = new Set([
     "text",
     "number",
@@ -120,6 +130,10 @@ let lastAssessmentSubmissionAt = -Infinity;
 let learningModules = [];
 let learningContentReady = false;
 let learningQuizSubmitted = false;
+let submissionState = "idle";
+let pendingSubmissionParticipantId = null;
+let pendingSubmissionBody = null;
+let submissionMayHaveSucceeded = false;
 
 const participantSession = {
     participantId: null,
@@ -1126,6 +1140,184 @@ function prepareSubmissionPayload() {
     };
 }
 
+function setSubmissionState(state) {
+    submissionState = state;
+    submitResultsButton.hidden = state === "success";
+    submitResultsButton.disabled = state === "submitting" || state === "success";
+    submitResultsButton.textContent =
+        state === "submitting" ? "Submitting..." : "Submit Results";
+    newParticipantButton.disabled = state !== "success";
+
+    if (state === "submitting") {
+        submissionStatus.textContent = "Submitting your responses. Please wait.";
+    } else if (state === "success") {
+        submissionStatus.textContent =
+            "Your responses have been saved successfully.";
+        newParticipantButton.focus();
+    } else if (state === "failure") {
+        submissionStatus.textContent =
+            "We couldn't confirm that your responses were saved. Please try again.";
+    } else {
+        submissionStatus.textContent = "Your results have not been submitted.";
+    }
+}
+
+function verifyParticipantSaved(
+    participantId,
+    timeoutMilliseconds = submissionVerificationTimeoutMilliseconds,
+) {
+    return new Promise((resolve, reject) => {
+        const callbackName = `deepfakeDetectiveVerification_${Date.now()}_${Math.random()
+            .toString(36)
+            .slice(2)}`;
+        const script = document.createElement("script");
+        const verificationUrl = new URL(submissionEndpoint);
+        let settled = false;
+        let timeoutId;
+
+        const cleanup = () => {
+            window.clearTimeout(timeoutId);
+            script.remove();
+            delete window[callbackName];
+        };
+        const rejectVerification = () => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            cleanup();
+            reject(new Error("Submission verification failed."));
+        };
+
+        window[callbackName] = (result) => {
+            if (
+                !result ||
+                result.participantId !== participantId ||
+                result.saved !== true
+            ) {
+                rejectVerification();
+                return;
+            }
+
+            if (settled) {
+                return;
+            }
+            settled = true;
+            cleanup();
+            resolve(true);
+        };
+
+        verificationUrl.searchParams.set("participantId", participantId);
+        verificationUrl.searchParams.set("callback", callbackName);
+        script.src = verificationUrl.toString();
+        script.async = true;
+        script.onerror = rejectVerification;
+        timeoutId = window.setTimeout(rejectVerification, timeoutMilliseconds);
+        document.head.appendChild(script);
+    });
+}
+
+function waitForSubmissionVerification() {
+    return new Promise((resolve) => {
+        window.setTimeout(resolve, submissionVerificationDelayMilliseconds);
+    });
+}
+
+async function verifySubmissionWithRetries(participantId) {
+    let lastError;
+
+    for (let attempt = 0; attempt < submissionVerificationAttempts; attempt += 1) {
+        try {
+            await verifyParticipantSaved(participantId);
+            return true;
+        } catch (error) {
+            lastError = error;
+        }
+
+        if (attempt < submissionVerificationAttempts - 1) {
+            await waitForSubmissionVerification();
+        }
+    }
+
+    throw lastError;
+}
+
+async function postSubmission(
+    body,
+    timeoutMilliseconds = submissionPostTimeoutMilliseconds,
+) {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(
+        () => controller.abort(),
+        timeoutMilliseconds,
+    );
+
+    try {
+        await fetch(submissionEndpoint, {
+            method: "POST",
+            mode: "no-cors",
+            headers: {
+                "Content-Type": "text/plain;charset=utf-8",
+            },
+            body,
+            signal: controller.signal,
+        });
+    } finally {
+        window.clearTimeout(timeoutId);
+    }
+}
+
+async function handleResultsSubmission() {
+    if (submissionState === "submitting" || submissionState === "success") {
+        return;
+    }
+
+    const participantId = participantSession.participantId;
+    if (!participantId) {
+        setSubmissionState("failure");
+        return;
+    }
+
+    if (pendingSubmissionParticipantId !== participantId) {
+        pendingSubmissionParticipantId = participantId;
+        pendingSubmissionBody = JSON.stringify(prepareSubmissionPayload());
+        submissionMayHaveSucceeded = false;
+    }
+
+    setSubmissionState("submitting");
+
+    if (submissionMayHaveSucceeded) {
+        try {
+            await verifySubmissionWithRetries(participantId);
+            setSubmissionState("success");
+            return;
+        } catch {
+            // A previous request was not confirmed, so retry the same payload.
+        }
+    }
+
+    submissionMayHaveSucceeded = true;
+    try {
+        await postSubmission(pendingSubmissionBody);
+    } catch {
+        // Delivery is ambiguous, so verification remains the source of truth.
+    }
+
+    try {
+        await verifySubmissionWithRetries(participantId);
+        setSubmissionState("success");
+    } catch {
+        setSubmissionState("failure");
+    }
+}
+
+function resetSubmissionState() {
+    pendingSubmissionParticipantId = null;
+    pendingSubmissionBody = null;
+    submissionMayHaveSucceeded = false;
+    setSubmissionState("idle");
+}
+
 function formatPercentage(value) {
     return value === null ? "Not available" : `${value}%`;
 }
@@ -1201,6 +1393,7 @@ function resetExperimentSession() {
     assessmentVideo.removeAttribute("src");
     assessmentVideo.load();
     clearLearningMedia();
+    resetSubmissionState();
     showStage(0);
 }
 
@@ -1983,6 +2176,12 @@ assessmentForm.addEventListener("change", (event) => {
 
 learningCheckAnswer.addEventListener("click", handleLearningCheckAnswer);
 learningContinue.addEventListener("click", handleLearningContinue);
+submitResultsButton.addEventListener("click", handleResultsSubmission);
+newParticipantButton.addEventListener("click", () => {
+    if (submissionState === "success") {
+        resetExperimentSession();
+    }
+});
 learningQuizControls.addEventListener("change", (event) => {
     if (!event.target.matches('input[name="learning-quiz-answer"]')) {
         return;
@@ -2045,6 +2244,7 @@ async function loadDemographics() {
     }
 }
 
+resetSubmissionState();
 showStage(0, false);
 loadDemographics();
 loadAssessmentContent();

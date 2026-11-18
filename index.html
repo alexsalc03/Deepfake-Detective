@@ -472,20 +472,34 @@
                 <section class="submission-section" aria-labelledby="submission-heading">
                     <div>
                         <h3 id="submission-heading">Submit results</h3>
-                        <p id="submission-status">
-                            Automatic submission will be enabled in the next phase.
-                            Your results have not been sent.
+                        <p
+                            id="submission-status"
+                            role="status"
+                            aria-live="polite"
+                            aria-atomic="true"
+                        >
+                            Your results have not been submitted.
                         </p>
                     </div>
-                    <button
-                        id="submit-results"
-                        class="button"
-                        type="button"
-                        aria-describedby="submission-status"
-                        disabled
-                    >
-                        Submit Results
-                    </button>
+                    <div class="submission-actions">
+                        <button
+                            id="new-participant"
+                            class="button button-secondary"
+                            type="button"
+                            aria-describedby="submission-status"
+                            disabled
+                        >
+                            New Participant
+                        </button>
+                        <button
+                            id="submit-results"
+                            class="button button-primary"
+                            type="button"
+                            aria-describedby="submission-status"
+                        >
+                            Submit Results
+                        </button>
+                    </div>
                 </section>
             </section>
         </main>
