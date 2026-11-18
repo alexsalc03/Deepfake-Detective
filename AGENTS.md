@@ -143,19 +143,142 @@ Do not implement additional features or introduce new technologies without expla
 
 ## UI/UX Design
 
-For UI design and visual refinement tasks, use the
-frontend-design skill when available.
+The application follows a clean, minimalist, Apple-inspired design language.
 
-Prioritize balanced proportions, usability, visual hierarchy,
-and compact, comfortable layouts.
+All new UI components must remain visually consistent with the existing implementation.
+Design Principles
 
-Avoid oversized typography, excessive whitespace,
-generic dashboard layouts, and unnecessary cards.
+    Prioritize usability, simplicity, and visual consistency.
 
-Evaluate the rendered interface visually whenever possible.
+    Use a restrained, professional design appropriate for a university research application.
 
-The application should feel like a polished, human-centered
-research product rather than a marketing website.
+    Avoid generic AI-generated layouts, marketing-style interfaces, and unnecessary visual decoration.
 
-Visual design improvements must not introduce new frameworks
-or dependencies.
+    Maintain balanced proportions and comfortable spacing.
+
+    Prefer a compact, functional interface over oversized elements and excessive whitespace.
+
+    Preserve the established design system rather than introducing new visual styles.
+
+Colors
+
+    Primary accent: #1976D2 (blue).
+
+    Primary text: #1D1D1F.
+
+    Secondary text: #52525B.
+
+    Background: white or subtle neutral tones such as #FAFAFA.
+
+    Borders: subtle neutral gray, approximately #E5E5E7.
+
+Use CSS variables for shared colors.
+
+Use blue sparingly for interactive elements and selected states.
+
+Do not introduce:
+
+    Green or teal accents.
+
+    Gradients.
+
+    Neon colors.
+
+    Additional accent colors without justification.
+
+Ensure WCAG AA text contrast.
+Typography
+
+    Use one consistent system font family throughout the application.
+
+    Do not introduce external fonts or decorative typefaces.
+
+    Establish hierarchy through font size, weight, and spacing.
+
+    Avoid oversized headings.
+
+    Use readable body text and comfortable line heights.
+
+    Keep text blocks at a reasonable reading width.
+
+    Use tabular numbers for numerical results and metrics.
+
+Layout and Spacing
+
+    Prefer open layouts with clear visual hierarchy.
+
+    Avoid excessive card containers, borders, and shadows.
+
+    Use whitespace and subtle separators to organize content.
+
+    Follow a consistent spacing scale based on 8px increments.
+
+    Avoid excessive vertical scrolling when practical.
+
+    Use small, consistent border radii.
+
+    Keep forms and assessment controls compact and easy to scan.
+
+Components
+
+    Reuse existing button, input, and layout styles.
+
+    Maintain consistent hover, focus, active, disabled, and error states.
+
+    Keep buttons and labels concise and action-oriented.
+
+    Avoid decorative icons, emojis, and unnecessary visual elements.
+
+    Use native HTML controls where appropriate.
+
+    Do not introduce UI libraries unless explicitly approved.
+
+Accessibility and Responsiveness
+
+    Use semantic HTML.
+
+    Maintain keyboard accessibility.
+
+    Provide visible focus indicators.
+
+    Ensure sufficient text contrast.
+
+    Use accessible labels and validation messages.
+
+    Maintain comfortable touch targets.
+
+    Prevent horizontal overflow.
+
+    Verify layouts at desktop and mobile widths.
+
+Research-Specific UI Requirements
+
+The interface must not unintentionally influence participant decisions.
+
+    Keep authentic and AI-generated classification options visually neutral and equally prominent.
+
+    Do not reveal correct answers before the appropriate stage.
+
+    Avoid visual cues that could bias participant responses.
+
+    Maintain consistent assessment layouts between pre-test and post-test.
+
+    Prioritize video visibility and question readability.
+
+Design Workflow
+
+For tasks involving significant UI design or visual refinement:
+
+    Use the frontend-design skill when available.
+
+    Inspect existing styles and components before creating new ones.
+
+    Reuse the established design system.
+
+    Make only changes necessary for the requested feature.
+
+    Inspect the rendered interface at desktop and mobile widths when possible.
+
+    Verify that changes do not introduce visual inconsistencies or regressions.
+
+Do not redesign existing screens unless explicitly requested.Existing design tokens and CSS variables take precedence over the example color values above. Do not change established visual styles unless explicitly requested.
