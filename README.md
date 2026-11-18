@@ -4,9 +4,9 @@ Deepfake Detective is a lightweight, locally running web application for a
 university research project. It will study whether interactive learning can
 improve people's ability to recognize political deepfakes.
 
-The repository currently contains the initial application interface and
-stage navigation. Experiment content loading, response collection, scoring,
-and data export have not been implemented yet.
+The repository currently contains the application interface, stage navigation,
+the configurable demographic questionnaire and consent gate. Assessment
+scoring and data export have not been implemented yet.
 
 ## Technology stack
 
@@ -66,12 +66,39 @@ files consistently.
 4. Post-Assessment
 5. Results
 
-The current interface provides temporary preview navigation between these
-stages. These controls do not record consent, save responses, or run the
-research protocol.
+The welcome stage loads the demographic questionnaire and consent statement
+from `data/demographics.json`. Required answers and explicit consent must be
+provided before participation can continue to the pre-assessment. The later
+stage controls remain temporary preview navigation.
 
 ## Research content
 
-All four JSON files currently contain empty arrays. Actual questionnaire
-questions, demographic fields, videos, educational lessons, and assessment
-content will be provided separately by team members.
+The assessment, video, and lesson content files do not yet contain research
+materials. They will be provided separately by team members.
+
+`data/demographics.json` contains temporary example demographic questions and a
+short consent statement. These will be replaced with final research content.
+
+`data/demographics.json` uses this structure:
+
+```json
+{
+    "consentStatement": "",
+    "questions": [
+        {
+            "id": "unique_question_id",
+            "label": "Question label",
+            "type": "text | number | select | radio | checkbox",
+            "required": true,
+            "options": ["Option one", "Option two"],
+            "min": 15,
+            "max": 100
+        }
+    ]
+}
+```
+
+`options` is required for `select`, `radio`, and `checkbox` questions and is
+omitted for `text` and `number` questions. An empty consent statement or an
+empty question array leaves participation disabled. Optional inclusive `min`
+and `max` bounds can be added to `number` questions.

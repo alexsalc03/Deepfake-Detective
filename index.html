@@ -18,6 +18,24 @@
     <div class="site-shell">
         <header class="app-header">
             <div class="brand">
+                <svg
+                    class="brand-icon"
+                    viewBox="0 0 32 32"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                    focusable="false"
+                >
+                    <path d="M6 12.5h15"></path>
+                    <path d="m9 12.5 1.5-5.5h6l1.5 5.5"></path>
+                    <path d="M9.5 17.5c0 3 2.5 5.5 5.5 5.5s5.5-2.5 5.5-5.5"></path>
+                    <path d="M9 27c.8-3.5 3.1-5.3 6-5.3s5.2 1.8 6 5.3"></path>
+                    <circle cx="24.5" cy="22" r="3.2"></circle>
+                    <path d="m26.8 24.3 3 3"></path>
+                </svg>
                 <h1>Deepfake Detective</h1>
             </div>
         </header>
@@ -57,52 +75,100 @@
             >
                 <h2 id="welcome-title" class="visually-hidden" tabindex="-1">Welcome</h2>
 
-                <section class="content-section" aria-labelledby="introduction-heading">
-                    <div class="section-heading">
-                        <h3 id="introduction-heading">Study Introduction</h3>
-                        <p>The official study introduction will appear in this area.</p>
+                <div class="content-section">
+                    <div class="study-introduction">
+                        <p><strong>Can you tell what's real?</strong></p>
+                        <p>
+                            AI-generated videos are becoming increasingly realistic, making it
+                            harder to distinguish authentic content from manipulated media.
+                        </p>
+                        <p>
+                            In this short interactive study, you'll evaluate political videos,
+                            explore how deepfakes work, and put your detection skills to the
+                            test.
+                        </p>
+                        <p><strong>Duration:</strong> Approximately 10–15 minutes.</p>
                     </div>
-                    <p class="placeholder-note" aria-label="Placeholder for study introduction">
-                        <span class="placeholder-label">Placeholder</span>
-                        Introduction content will be provided by the research team.
+                </div>
+
+                <form
+                    id="demographics-form"
+                    class="demographics-form"
+                    aria-describedby="demographics-config-status form-error-summary"
+                    novalidate
+                >
+                    <p
+                        id="demographics-config-status"
+                        class="configuration-status"
+                        role="status"
+                        aria-live="polite"
+                    >
+                        Loading questionnaire.
                     </p>
-                </section>
 
-                <div class="welcome-grid">
-                    <section class="content-section" aria-labelledby="demographics-heading">
-                        <div class="section-heading">
-                            <h3 id="demographics-heading">Demographic Questionnaire</h3>
-                            <p>Participant background questions will appear here.</p>
-                        </div>
-                        <p
-                            class="placeholder-note"
-                            aria-label="Placeholder for demographic questionnaire"
+                    <div class="welcome-grid">
+                        <section class="content-section" aria-labelledby="consent-heading">
+                            <div class="section-heading">
+                                <h3 id="consent-heading">Participant Consent</h3>
+                                <p>
+                                    Review the study consent statement before choosing whether to
+                                    participate.
+                                </p>
+                            </div>
+                            <p id="consent-statement" class="consent-statement">
+                                Loading consent statement.
+                            </p>
+                            <div id="consent-controls" class="consent-controls">
+                                <label class="choice-option consent-choice" for="consent-checkbox">
+                                    <input
+                                        id="consent-checkbox"
+                                        name="consent"
+                                        type="checkbox"
+                                        aria-describedby="consent-statement consent-error"
+                                        required
+                                        disabled
+                                    >
+                                    <span>I understand the purpose of the study and agree to participate.</span>
+                                </label>
+                                <p id="consent-error" class="field-error" role="alert" hidden>
+                                    Consent is required to participate.
+                                </p>
+                            </div>
+                        </section>
+
+                        <section class="content-section" aria-labelledby="demographics-heading">
+                            <div class="section-heading">
+                                <h3 id="demographics-heading">Demographic Questionnaire</h3>
+                                <p>Complete each required question before continuing.</p>
+                            </div>
+                            <div
+                                id="demographics-questions"
+                                class="question-list"
+                                aria-label="Demographic questions"
+                            ></div>
+                        </section>
+                    </div>
+
+                    <p
+                        id="form-error-summary"
+                        class="form-error-summary"
+                        role="alert"
+                        hidden
+                    >
+                        Please correct the highlighted fields before continuing.
+                    </p>
+
+                    <div class="screen-actions">
+                        <button
+                            id="start-experiment"
+                            class="button button-primary"
+                            type="submit"
+                            disabled
                         >
-                            <span class="placeholder-label">Questionnaire placeholder</span>
-                            Configured demographic questions will be loaded in a later phase.
-                        </p>
-                    </section>
-
-                    <section class="content-section" aria-labelledby="consent-heading">
-                        <div class="section-heading">
-                            <h3 id="consent-heading">Participant Consent</h3>
-                            <p>The study consent statement will appear here.</p>
-                        </div>
-                        <p
-                            class="placeholder-note"
-                            aria-label="Placeholder for participant consent"
-                        >
-                            <span class="placeholder-label">Consent placeholder</span>
-                            Consent text and validation will be added in a later phase.
-                        </p>
-                    </section>
-                </div>
-
-                <div class="screen-actions">
-                    <button class="button button-primary" type="button" data-next-stage>
-                        Start Experiment
-                    </button>
-                </div>
+                            Start Experiment
+                        </button>
+                    </div>
+                </form>
             </section>
 
             <section
