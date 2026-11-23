@@ -30,7 +30,7 @@ deepfake-detective/
 ├── js/
 │   └── app.js
 ├── data/
-│   ├── demographics.json
+│   ├── pre-questionnaire.json
 │   ├── assessment.json
 │   ├── videos.json
 │   └── lessons.json
@@ -77,7 +77,7 @@ files consistently.
 5. Results
 
 The welcome stage loads the demographic questionnaire and consent statement
-from `data/demographics.json`. Required answers and explicit consent must be
+from `data/pre-questionnaire.json`. Required answers and explicit consent must be
 provided before participation can continue to the pre-assessment. This opening
 stage has three screens: Welcome and consent, About you, and AI experience and
 attitudes. Back/Continue navigation preserves answers. Question `section` values
@@ -127,10 +127,10 @@ replaced with approved educational content.
 The application shows an unavailable/configuration message instead of
 fabricating content when assessment or lesson files are empty or invalid.
 
-`data/demographics.json` contains temporary example demographic questions and a
+`data/pre-questionnaire.json` contains temporary example demographic questions and a
 short consent statement. These will be replaced with final research content.
 
-`data/demographics.json` uses this structure:
+`data/pre-questionnaire.json` uses this structure:
 
 ```json
 {

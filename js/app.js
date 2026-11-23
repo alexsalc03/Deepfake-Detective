@@ -2432,7 +2432,7 @@ assessmentVideo.addEventListener("error", () => {
 
 async function loadDemographics() {
     try {
-        const response = await fetch("data/demographics.json");
+        const response = await fetch("data/pre-questionnaire.json");
         if (!response.ok) {
             throw new Error("Questionnaire request failed");
         }
