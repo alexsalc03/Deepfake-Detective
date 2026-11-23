@@ -7,7 +7,7 @@ const stages = [
         id: "pre-assessment",
         screenId: "assessment-screen",
         assessmentMode: "pre",
-        title: "Pre-Assessment",
+        title: "Round-1",
         nextLabel: "Continue to Learning",
     },
     {
@@ -18,7 +18,7 @@ const stages = [
         id: "post-assessment",
         screenId: "assessment-screen",
         assessmentMode: "post",
-        title: "Post-Assessment",
+        title: "Round-2",
         nextLabel: "View Results",
     },
     {
@@ -2175,7 +2175,7 @@ function renderLearningStage(moveFocus = false) {
 
     learningContinue.textContent =
         moduleIndex === learningModules.length - 1
-            ? "Continue to Post-Assessment"
+            ? "Continue to Round-2"
             : "Continue";
 
     if (moveFocus) {

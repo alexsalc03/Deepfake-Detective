@@ -71,14 +71,14 @@ files consistently.
 ## Application flow
 
 1. Welcome/Demographics
-2. Pre-Assessment
+2. Round-1
 3. Learning
-4. Post-Assessment
+4. Round-2
 5. Results
 
 The welcome stage loads the demographic questionnaire and consent statement
 from `data/pre-questionnaire.json`. Required answers and explicit consent must be
-provided before participation can continue to the pre-assessment. This opening
+provided before participation can continue to the Round-1. This opening
 stage has three screens: Welcome and consent, About you, and AI experience and
 attitudes. Back/Continue navigation preserves answers. Question `section` values
 in the JSON are `demographics` (the default) or `ai`; the last screen starts the
@@ -87,16 +87,16 @@ experiment only after all answers and consent are validated.
 Starting the experiment assigns the participant to one of two stable
 conditions:
 
-- Condition 1: pre-assessment uses set A; post-assessment uses set B
-- Condition 2: pre-assessment uses set B; post-assessment uses set A
+- Condition 1: Round-1 uses set A; Round-2 uses set B
+- Condition 2: Round-1 uses set B; Round-2 uses set A
 
 Each assessment shows one configured video at a time. A submitted answer is
 stored in the in-memory participant session and the assessment advances only
-after all required responses are valid. The last pre-assessment video moves to
+after all required responses are valid. The last Round-1 video moves to
 the Learning stage. Learning shows one module at a time in the order configured
 in `data/lessons.json`. A configured quiz must be checked before a participant
-can continue. The final module opens the post-assessment, and the last
-post-assessment video moves to Results.
+can continue. The final module opens the Round-2, and the last
+Round-2 video moves to Results.
 
 Participant state is held in the existing `participantSession` object in
 `js/app.js`. It includes the participant ID, consent and demographic responses,
