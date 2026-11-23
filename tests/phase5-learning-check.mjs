@@ -137,21 +137,19 @@ async function completeDemographics(client) {
                 control.dispatchEvent(new Event(eventName, { bubbles: true }));
             };
 
-            setValue("#demographic-age", "25");
-            document.querySelector('input[name="demographic-gender"][value="Woman"]').click();
-            setValue(
-                "#demographic-education_level",
-                "Bachelor's degree",
-                "change"
-            );
-            document.querySelector(
-                'input[name="demographic-ai_content_familiarity"][value="Moderately familiar"]'
-            ).click();
-            document.querySelector(
-                'input[name="demographic-deepfake_experience"][value="Limited experience"]'
-            ).click();
+            const clickNext = () => document.querySelector("#start-experiment").click();
             document.querySelector("#consent-checkbox").click();
-            document.querySelector("#start-experiment").click();
+            clickNext();
+            setValue("#demographic-age", "25");
+            setValue("#demographic-gender", "Woman", "change");
+            setValue("#demographic-education_level", "University degree", "change");
+            const scale = document.querySelector('[data-demographic-id="political_leaning"] input[type="range"]');
+            scale.value = "4";
+            scale.dispatchEvent(new Event("input", { bubbles: true }));
+            clickNext();
+            document.querySelector('input[name="demographic-ai_sentiment"][value="Unsure"]').click();
+            document.querySelector('input[name="demographic-deepfake_exposure_frequency"][value="Never"]').click();
+            clickNext();
             return true;
         })()
     `);
@@ -253,7 +251,7 @@ async function run() {
         await waitForHttp(`http://127.0.0.1:${serverPort}/`);
 
         chrome = spawn(
-            "google-chrome",
+            process.env.CHROME_BIN || "google-chrome",
             [
                 "--headless=new",
                 "--no-sandbox",

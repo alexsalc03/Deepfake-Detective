@@ -78,7 +78,11 @@ files consistently.
 
 The welcome stage loads the demographic questionnaire and consent statement
 from `data/demographics.json`. Required answers and explicit consent must be
-provided before participation can continue to the pre-assessment.
+provided before participation can continue to the pre-assessment. This opening
+stage has three screens: Welcome and consent, About you, and AI experience and
+attitudes. Back/Continue navigation preserves answers. Question `section` values
+in the JSON are `demographics` (the default) or `ai`; the last screen starts the
+experiment only after all answers and consent are validated.
 
 Starting the experiment assigns the participant to one of two stable
 conditions:
@@ -135,7 +139,7 @@ short consent statement. These will be replaced with final research content.
         {
             "id": "unique_question_id",
             "label": "Question label",
-            "type": "text | number | select | radio | checkbox",
+            "type": "text | number | select | radio | checkbox | range",
             "required": true,
             "options": ["Option one", "Option two"],
             "min": 15,
@@ -149,6 +153,21 @@ short consent statement. These will be replaced with final research content.
 omitted for `text` and `number` questions. An empty consent statement or an
 empty question array leaves participation disabled. Optional inclusive `min`
 and `max` bounds can be added to `number` questions.
+
+`range` questions use integer `min`/`max` bounds and `minLabel`/`maxLabel`
+endpoint labels. Their `options` are separate radio alternatives to the slider.
+A required range question needs an explicit slider or radio selection. Responses
+store the selected number or alternative text. Political leaning uses 1–7.
+
+Questions can use `showIf: { "questionId": "parent_id", "values": ["answer"] }`
+to appear only for matching radio or dropdown answers. Hidden conditional
+questions are excluded from required validation and recorded responses.
+The political deepfake follow-up appears after any selected exposure answer
+except Never, including Unsure.
+
+Checkbox questions may set `exclusiveOption` to an option that cannot be combined
+with other answers (such as “I don’t remember”). Selecting it clears other choices,
+and selecting another choice clears it.
 
 ### Learning configuration
 

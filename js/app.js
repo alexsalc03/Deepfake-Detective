@@ -117,9 +117,11 @@ const supportedQuestionTypes = new Set([
     "select",
     "radio",
     "checkbox",
+    "range",
 ]);
 
 let currentStageIndex = 0;
+let introStep = 0;
 let demographicsConfig = null;
 let formReady = false;
 let assessmentQuestionsConfig = null;
@@ -222,6 +224,39 @@ function createElement(tagName, className, text) {
     return element;
 }
 
+function isQuestionApplicable(question) {
+    if (!question.showIf) return true;
+    const parent = getQuestionElement(question.showIf.questionId);
+    const selected = parent?.querySelector('input:checked, select');
+    return question.showIf.values.includes(selected?.value);
+}
+
+function showIntroStep(step, moveFocus = true) {
+    introStep = step;
+    document.querySelector("#welcome-introduction").hidden = step !== 0;
+    document.querySelector("#welcome-consent").hidden = step !== 0;
+    document.querySelector("#questionnaire-section").hidden = step === 0;
+    document.querySelector("#intro-back").hidden = step === 0;
+    document.querySelector("#intro-progress").textContent = `Step ${step + 1} of 3`;
+    startExperimentButton.textContent = step === 2 ? "Start Experiment" : "Continue";
+    const heading = document.querySelector("#demographics-heading");
+    heading.textContent = step === 2 ? "AI experience and attitudes" : "About you";
+    demographicsConfig?.questions.forEach((question) => {
+        const section = question.section ?? "demographics";
+        const element = getQuestionElement(question.id);
+        element.hidden = !isQuestionApplicable(question) || step === 0 ||
+            section !== (step === 1 ? "demographics" : "ai");
+        const subsection = demographicsQuestions.querySelector(`[data-question-heading="${question.id}"]`);
+        if (subsection) subsection.hidden = element.hidden;
+        const description = demographicsQuestions.querySelector(`[data-subsection-description="${question.id}"]`);
+        if (description) description.hidden = element.hidden;
+    });
+    formErrorSummary.hidden = true;
+    if (moveFocus) {
+        (step === 0 ? document.querySelector("#welcome-title") : heading).focus();
+    }
+}
+
 function getQuestionControlId(questionId, optionIndex = null) {
     const suffix = optionIndex === null ? "" : `-${optionIndex}`;
     return `demographic-${questionId}${suffix}`;
@@ -285,7 +320,16 @@ function createChoiceQuestion(question) {
         input.name = getQuestionControlId(question.id);
         input.type = question.type;
         input.value = option;
-        input.required = Boolean(question.required);
+        input.required = question.type === "radio" && Boolean(question.required);
+        if (question.type === "checkbox" && question.exclusiveOption) {
+            input.addEventListener("change", () => {
+                if (!input.checked) return;
+                choices.querySelectorAll("input").forEach((other) => {
+                    if (other !== input && (input.value === question.exclusiveOption ||
+                        other.value === question.exclusiveOption)) other.checked = false;
+                });
+            });
+        }
         input.setAttribute(
             "aria-describedby",
             `${getQuestionControlId(question.id)}-error`,
@@ -298,6 +342,10 @@ function createChoiceQuestion(question) {
     });
 
     fieldset.append(legend, choices, error);
+    if (question.helpText) {
+        const help = createElement("p", "question-help", question.helpText);
+        legend.after(help);
+    }
     return fieldset;
 }
 
@@ -347,13 +395,86 @@ function createSingleControlQuestion(question) {
     return container;
 }
 
+function createRangeQuestion(question) {
+    const fieldset = createChoiceQuestion({ ...question, type: "radio" });
+    fieldset.classList.add("range-question");
+    const legend = fieldset.querySelector("legend");
+    legend.id = `${getQuestionControlId(question.id)}-label`;
+    const range = document.createElement("input");
+    range.type = "range";
+    range.className = "confidence-range";
+    range.min = question.min;
+    range.max = question.max;
+    range.step = "1";
+    range.defaultValue = String(Math.floor((question.min + question.max) / 2));
+    range.dataset.touched = "false";
+    range.setAttribute("aria-labelledby", legend.id);
+    range.setAttribute("aria-describedby", `${getQuestionControlId(question.id)}-error`);
+    range.id = `${getQuestionControlId(question.id)}-scale`;
+    const labels = createElement("div", "political-scale-labels");
+    labels.append(
+        createElement("span", "", question.minLabel),
+        createElement("span", "", question.maxLabel),
+    );
+    if (question.midpointLabel) {
+        labels.firstElementChild.after(
+            createElement("span", "", question.midpointLabel),
+        );
+    }
+    const ticks = createElement("div", "political-scale-ticks");
+    ticks.setAttribute("aria-hidden", "true");
+    for (let value = question.min; value <= question.max; value++) {
+        ticks.append(createElement("span", "", String(value)));
+    }
+    const scale = createElement("div", "political-scale");
+    scale.append(labels, range, ticks);
+    range.classList.add("political-scale-input");
+    function resetRange() {
+        scale.classList.remove("has-alternative");
+        range.dataset.touched = "false";
+        range.setAttribute("aria-valuetext", "No value selected");
+    }
+    function selectRange() {
+        scale.classList.remove("has-alternative");
+        fieldset.querySelectorAll('input[type="radio"]').forEach((radio) => {
+            radio.checked = false;
+        });
+        range.dataset.touched = "true";
+        range.setAttribute("aria-valuetext", `${range.value} of ${question.max}, ${question.minLabel} to ${question.maxLabel}`);
+        clearQuestionError(fieldset);
+        formErrorSummary.hidden = true;
+    }
+    range.addEventListener("input", selectRange);
+    range.addEventListener("pointerup", selectRange);
+    fieldset.querySelectorAll('input[type="radio"]').forEach((radio) => {
+        radio.required = false;
+        radio.addEventListener("change", () => {
+            resetRange();
+            scale.classList.toggle("has-alternative", radio.checked);
+        });
+    });
+    demographicsForm.addEventListener("reset", resetRange);
+    legend.after(scale);
+    const error = fieldset.querySelector(".field-error");
+    scale.after(error);
+    const help = fieldset.querySelector(".question-help");
+    if (help) {
+        help.id = `${range.id}-help`;
+        legend.after(help);
+        range.setAttribute("aria-describedby", `${help.id} ${getQuestionControlId(question.id)}-error`);
+    }
+    resetRange();
+    return fieldset;
+}
+
 function renderQuestion(question) {
+    if (question.type === "range") return createRangeQuestion(question);
     return question.type === "radio" || question.type === "checkbox"
         ? createChoiceQuestion(question)
         : createSingleControlQuestion(question);
 }
 
-function isConfiguredQuestion(question) {
+function isConfiguredQuestion(question, questions) {
     const hasValidIdentity =
         question &&
         typeof question.id === "string" &&
@@ -361,7 +482,7 @@ function isConfiguredQuestion(question) {
         typeof question.label === "string" &&
         question.label.trim() &&
         supportedQuestionTypes.has(question.type);
-    const needsOptions = ["select", "radio", "checkbox"].includes(question?.type);
+    const needsOptions = ["select", "radio", "checkbox", "range"].includes(question?.type);
     const hasValidOptions =
         !needsOptions ||
         (Array.isArray(question.options) &&
@@ -377,7 +498,28 @@ function isConfiguredQuestion(question) {
                 !Number.isFinite(question.max) ||
                 question.min <= question.max));
 
-    return Boolean(hasValidIdentity && hasValidOptions && hasValidNumberRange);
+    const hasValidRange = question?.type !== "range" || (
+        Number.isInteger(question.min) && Number.isInteger(question.max) &&
+        question.min < question.max &&
+        [question.minLabel, question.maxLabel].every(
+            (label) => typeof label === "string" && label.trim(),
+        )
+    );
+    const hasValidExclusiveOption = question?.exclusiveOption === undefined || (
+        question.type === "checkbox" && hasValidOptions &&
+        question.options.includes(question.exclusiveOption)
+    );
+    let hasValidCondition = question?.showIf === undefined;
+    if (isRecord(question?.showIf)) {
+        const parent = questions.find((item) => item?.id === question.showIf.questionId);
+        hasValidCondition = parent && parent !== question &&
+            ["radio", "select"].includes(parent.type) &&
+            Array.isArray(parent.options) &&
+            Array.isArray(question.showIf.values) && question.showIf.values.length > 0 &&
+            question.showIf.values.every((value) => parent.options.includes(value));
+    }
+    return Boolean(hasValidIdentity && hasValidOptions && hasValidNumberRange &&
+        hasValidRange && hasValidExclusiveOption && hasValidCondition);
 }
 
 function isRecord(value) {
@@ -767,7 +909,7 @@ function initialiseDemographics(config) {
     formErrorSummary.hidden = true;
     consentCheckbox.checked = false;
 
-    if (questions === null || !questions.every(isConfiguredQuestion)) {
+    if (questions === null || !questions.every((question) => isConfiguredQuestion(question, questions))) {
         setParticipationUnavailable(
             "Questionnaire content is not validly configured. Participation is unavailable.",
             true,
@@ -787,9 +929,20 @@ function initialiseDemographics(config) {
     }
 
     questions.forEach((question) => {
+        if (question.subsection) {
+            const heading = createElement("h4", "question-subsection", question.subsection);
+            heading.dataset.questionHeading = question.id;
+            demographicsQuestions.append(heading);
+        }
+        if (question.subsectionDescription) {
+            const description = createElement("p", "question-definition", question.subsectionDescription);
+            description.dataset.subsectionDescription = question.id;
+            demographicsQuestions.append(description);
+        }
         demographicsQuestions.append(renderQuestion(question));
     });
 
+    showIntroStep(0, false);
     demographicsConfigStatus.hidden = true;
     formReady = questions.length > 0 && hasConsentStatement;
     consentCheckbox.disabled = !formReady;
@@ -798,6 +951,25 @@ function initialiseDemographics(config) {
 
 function validateQuestion(question) {
     const questionElement = getQuestionElement(question.id);
+
+    if (question.type === "range") {
+        const selected = questionElement.querySelector('input[type="radio"]:checked');
+        const range = questionElement.querySelector('input[type="range"]');
+        let value = "";
+        let valid = !question.required;
+        if (selected) {
+            value = selected.value;
+            valid = question.options.includes(value);
+        } else if (range.dataset.touched === "true") {
+            value = Number(range.value);
+            valid = Number.isInteger(value) && value >= question.min && value <= question.max;
+        }
+        return {
+            valid,
+            message: valid ? "" : "Select a position on the scale or choose one of the options below.",
+            value,
+        };
+    }
 
     if (question.type === "checkbox") {
         const checkedInputs = [
@@ -826,6 +998,9 @@ function validateQuestion(question) {
             };
         }
 
+        if (question.exclusiveOption && values.includes(question.exclusiveOption) && values.length > 1) {
+            return { valid: false, message: `Choose either “${question.exclusiveOption}” or the other options.`, value: values };
+        }
         return { valid: true, message: "", value: values };
     }
 
@@ -917,11 +1092,15 @@ function validateQuestion(question) {
     return { valid: true, message: "", value: rawValue };
 }
 
-function validateDemographics() {
+function validateDemographics(questions = demographicsConfig.questions) {
     const responses = {};
     let firstInvalidElement = null;
 
-    demographicsConfig.questions.forEach((question) => {
+    questions.forEach((question) => {
+        if (!isQuestionApplicable(question)) {
+            clearQuestionError(getQuestionElement(question.id));
+            return;
+        }
         const result = validateQuestion(question);
         const questionElement = getQuestionElement(question.id);
 
@@ -1383,6 +1562,7 @@ function resetExperimentSession() {
     lastAssessmentSubmissionAt = -Infinity;
     learningQuizSubmitted = false;
     demographicsForm.reset();
+    showIntroStep(0, false);
     formErrorSummary.hidden = true;
     clearConsentError();
     demographicsQuestions
@@ -2094,11 +2274,6 @@ function generateParticipantId() {
 function handleDemographicsSubmit(event) {
     event.preventDefault();
 
-    if (participantSession.participantId) {
-        showStage(1);
-        return;
-    }
-
     if (!formReady || !demographicsConfig) {
         formErrorSummary.textContent =
             "Participation is unavailable until the questionnaire is fully configured.";
@@ -2106,7 +2281,11 @@ function handleDemographicsSubmit(event) {
         return;
     }
 
-    const validation = validateDemographics();
+    const questions = introStep === 0 ? [] : demographicsConfig.questions.filter(
+        (question) => (question.section ?? "demographics") ===
+            (introStep === 1 ? "demographics" : "ai"),
+    );
+    const validation = validateDemographics(questions);
     if (!validation.isValid) {
         formErrorSummary.textContent =
             "Please correct the highlighted fields and confirm consent before continuing.";
@@ -2119,10 +2298,28 @@ function handleDemographicsSubmit(event) {
         return;
     }
 
-    participantSession.participantId = generateParticipantId();
+    if (introStep < 2) {
+        showIntroStep(introStep + 1);
+        return;
+    }
+
+    const completeValidation = validateDemographics();
+    if (!completeValidation.isValid) {
+        const question = demographicsConfig.questions.find(
+            (item) => getQuestionElement(item.id) === completeValidation.firstInvalidElement,
+        );
+        showIntroStep(!consentCheckbox.checked ? 0 : question?.section === "ai" ? 2 : 1);
+        formErrorSummary.textContent = "Please complete the highlighted fields before continuing.";
+        formErrorSummary.hidden = false;
+        (completeValidation.firstInvalidElement?.querySelector("input, select") ?? consentCheckbox).focus();
+        return;
+    }
+    if (!participantSession.participantId) {
+        participantSession.participantId = generateParticipantId();
+        assignParticipantCondition();
+    }
     participantSession.consentProvided = true;
-    participantSession.demographics = validation.responses;
-    assignParticipantCondition();
+    participantSession.demographics = completeValidation.responses;
     formErrorSummary.hidden = true;
     showStage(1);
 }
@@ -2135,6 +2332,10 @@ document.addEventListener("click", (event) => {
     }
 });
 
+document.querySelector("#intro-back").addEventListener("click", () => {
+    showIntroStep(Math.max(0, introStep - 1));
+});
+
 demographicsForm.addEventListener("submit", handleDemographicsSubmit);
 
 demographicsForm.addEventListener("input", (event) => {
@@ -2143,6 +2344,9 @@ demographicsForm.addEventListener("input", (event) => {
 });
 
 demographicsForm.addEventListener("change", (event) => {
+    if (event.target.closest("[data-demographic-question]")) {
+        showIntroStep(introStep, false);
+    }
     clearQuestionError(event.target.closest("[data-demographic-question]"));
     if (event.target === consentCheckbox) {
         clearConsentError();

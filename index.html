@@ -75,7 +75,7 @@
             >
                 <h2 id="welcome-title" class="visually-hidden" tabindex="-1">Welcome</h2>
 
-                <div class="content-section">
+                <div class="content-section" id="welcome-introduction">
                     <div class="study-introduction">
                         <p><strong>Can you tell what's real?</strong></p>
                         <p>
@@ -107,7 +107,7 @@
                     </p>
 
                     <div class="welcome-grid">
-                        <section class="content-section" aria-labelledby="consent-heading">
+                        <section id="welcome-consent" class="content-section" aria-labelledby="consent-heading">
                             <div class="section-heading">
                                 <h3 id="consent-heading">Participant Consent</h3>
                                 <p>
@@ -136,9 +136,9 @@
                             </div>
                         </section>
 
-                        <section class="content-section" aria-labelledby="demographics-heading">
+                        <section id="questionnaire-section" class="content-section" aria-labelledby="demographics-heading" hidden>
                             <div class="section-heading">
-                                <h3 id="demographics-heading">Demographic Questionnaire</h3>
+                                <h3 id="demographics-heading" tabindex="-1">About you</h3>
                                 <p>Complete each required question before continuing.</p>
                             </div>
                             <div
@@ -158,14 +158,16 @@
                         Please correct the highlighted fields before continuing.
                     </p>
 
-                    <div class="screen-actions">
+                    <div class="screen-actions screen-actions-split intro-actions">
+                        <button id="intro-back" class="button button-secondary" type="button" hidden>Back</button>
+                        <p id="intro-progress" class="assessment-position" aria-live="polite">Step 1 of 3</p>
                         <button
                             id="start-experiment"
                             class="button button-primary"
                             type="submit"
                             disabled
                         >
-                            Start Experiment
+                            Continue
                         </button>
                     </div>
                 </form>
