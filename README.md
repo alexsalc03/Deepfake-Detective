@@ -30,7 +30,7 @@ deepfake-detective/
 ├── js/
 │   └── app.js
 ├── data/
-│   ├── demographics.json
+│   ├── pre-questionnaire.json
 │   ├── assessment.json
 │   ├── videos.json
 │   └── lessons.json
@@ -71,28 +71,32 @@ files consistently.
 ## Application flow
 
 1. Welcome/Demographics
-2. Pre-Assessment
+2. Round-1
 3. Learning
-4. Post-Assessment
+4. Round-2
 5. Results
 
 The welcome stage loads the demographic questionnaire and consent statement
-from `data/demographics.json`. Required answers and explicit consent must be
-provided before participation can continue to the pre-assessment.
+from `data/pre-questionnaire.json`. Required answers and explicit consent must be
+provided before participation can continue to the Round-1. This opening
+stage has three screens: Welcome and consent, About you, and AI experience and
+attitudes. Back/Continue navigation preserves answers. Question `section` values
+in the JSON are `demographics` (the default) or `ai`; the last screen starts the
+experiment only after all answers and consent are validated.
 
 Starting the experiment assigns the participant to one of two stable
 conditions:
 
-- Condition 1: pre-assessment uses set A; post-assessment uses set B
-- Condition 2: pre-assessment uses set B; post-assessment uses set A
+- Condition 1: Round-1 uses set A; Round-2 uses set B
+- Condition 2: Round-1 uses set B; Round-2 uses set A
 
 Each assessment shows one configured video at a time. A submitted answer is
 stored in the in-memory participant session and the assessment advances only
-after all required responses are valid. The last pre-assessment video moves to
+after all required responses are valid. The last Round-1 video moves to
 the Learning stage. Learning shows one module at a time in the order configured
 in `data/lessons.json`. A configured quiz must be checked before a participant
-can continue. The final module opens the post-assessment, and the last
-post-assessment video moves to Results.
+can continue. The final module opens the Round-2, and the last
+Round-2 video moves to Results.
 
 Participant state is held in the existing `participantSession` object in
 `js/app.js`. It includes the participant ID, consent and demographic responses,
@@ -123,10 +127,10 @@ replaced with approved educational content.
 The application shows an unavailable/configuration message instead of
 fabricating content when assessment or lesson files are empty or invalid.
 
-`data/demographics.json` contains temporary example demographic questions and a
+`data/pre-questionnaire.json` contains temporary example demographic questions and a
 short consent statement. These will be replaced with final research content.
 
-`data/demographics.json` uses this structure:
+`data/pre-questionnaire.json` uses this structure:
 
 ```json
 {
@@ -135,7 +139,7 @@ short consent statement. These will be replaced with final research content.
         {
             "id": "unique_question_id",
             "label": "Question label",
-            "type": "text | number | select | radio | checkbox",
+            "type": "text | number | select | radio | checkbox | range",
             "required": true,
             "options": ["Option one", "Option two"],
             "min": 15,
@@ -149,6 +153,21 @@ short consent statement. These will be replaced with final research content.
 omitted for `text` and `number` questions. An empty consent statement or an
 empty question array leaves participation disabled. Optional inclusive `min`
 and `max` bounds can be added to `number` questions.
+
+`range` questions use integer `min`/`max` bounds and `minLabel`/`maxLabel`
+endpoint labels. Their `options` are separate radio alternatives to the slider.
+A required range question needs an explicit slider or radio selection. Responses
+store the selected number or alternative text. Political leaning uses 1–7.
+
+Questions can use `showIf: { "questionId": "parent_id", "values": ["answer"] }`
+to appear only for matching radio or dropdown answers. Hidden conditional
+questions are excluded from required validation and recorded responses.
+The political deepfake follow-up appears after any selected exposure answer
+except Never, including Unsure.
+
+Checkbox questions may set `exclusiveOption` to an option that cannot be combined
+with other answers (such as “I don’t remember”). Selecting it clears other choices,
+and selecting another choice clears it.
 
 ### Learning configuration
 

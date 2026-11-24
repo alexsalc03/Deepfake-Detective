@@ -116,13 +116,69 @@ async function completeDemographics(client) {
                 control.value = value;
                 control.dispatchEvent(new Event(eventName, { bubbles: true }));
             };
-            setValue("#demographic-age", "25");
-            document.querySelector('input[name="demographic-gender"][value="Woman"]').click();
-            setValue("#demographic-education_level", "Bachelor's degree", "change");
-            document.querySelector('input[name="demographic-ai_content_familiarity"][value="Moderately familiar"]').click();
-            document.querySelector('input[name="demographic-deepfake_experience"][value="Limited experience"]').click();
+            const clickNext = () => document.querySelector("#start-experiment").click();
             document.querySelector("#consent-checkbox").click();
-            document.querySelector("#start-experiment").click();
+            clickNext();
+            setValue("#demographic-age", "25");
+            setValue("#demographic-gender", "Woman", "change");
+            setValue("#demographic-education_level", "University degree", "change");
+            const scale = document.querySelector('[data-demographic-id="political_leaning"] input[type="range"]');
+            scale.value = "4";
+            scale.dispatchEvent(new Event("input", { bubbles: true }));
+            clickNext();
+            document.querySelector('input[name="demographic-ai_sentiment"][value="Unsure"]').click();
+            const require = (condition, message) => { if (!condition) throw new Error(message); };
+            require(introStep === 2, "Continue reaches AI questionnaire");
+            const configuredQuestions = demographicsConfig.questions;
+            const channelConfig = configuredQuestions.find(q => q.id === "deepfake_exposure_channels");
+            require(isConfiguredQuestion(channelConfig, configuredQuestions), "Current conditional config is valid");
+            require(!isConfiguredQuestion({ ...channelConfig, exclusiveOption: "Missing option" }, configuredQuestions),
+                "Unknown exclusive option is rejected");
+            require(!isConfiguredQuestion({ ...channelConfig, type: "radio" }, configuredQuestions),
+                "Exclusive option requires checkboxes");
+            for (const showIf of [null, {}, { questionId: "missing", values: ["Once"] },
+                { questionId: "deepfake_exposure_frequency", values: [] },
+                { questionId: "deepfake_exposure_frequency", values: ["Invalid answer"] }]) {
+                require(!isConfiguredQuestion({ ...channelConfig, showIf }, configuredQuestions),
+                    "Malformed conditional configuration is rejected");
+            }
+
+            require(document.querySelectorAll('[data-demographic-id="political_leaning"] .question-help').length === 1,
+                "Slider instruction is rendered once");
+            const exposure = [...document.querySelectorAll('input[name="demographic-deepfake_exposure_frequency"]')];
+            const channels = getQuestionElement("deepfake_exposure_channels");
+            const political = getQuestionElement("political_deepfake_exposure");
+            require(channels.hidden && political.hidden, "Follow-ups start hidden");
+            exposure.find(input => input.value === "Once").click();
+            require(!channels.hidden && !political.hidden, "Exposure reveals both follow-ups");
+            const options = [...channels.querySelectorAll("input")];
+            const instagram = options.find(input => input.value === "Instagram");
+            const youtube = options.find(input => input.value === "YouTube");
+            const unknown = options.find(input => input.value === "I don’t remember");
+            instagram.click(); youtube.click(); unknown.click();
+            require(unknown.checked && !instagram.checked && !youtube.checked,
+                "Recall alternative clears platform selections");
+            instagram.click();
+            require(instagram.checked && !unknown.checked, "Platform clears recall alternative");
+            unknown.checked = true;
+            require(!validateQuestion(demographicsConfig.questions.find(q => q.id === "deepfake_exposure_channels")).valid,
+                "Validation rejects contradictory selections");
+            unknown.checked = false;
+            political.querySelector('input[value="Yes"]').click();
+            exposure.find(input => input.value === "Unsure").click();
+            require(!channels.hidden && !political.hidden, "Unsure exposure keeps follow-ups visible");
+            exposure.find(input => input.value === "Never").click();
+            require(channels.hidden && political.hidden, "Never hides follow-ups");
+            const responses = validateDemographics().responses;
+            require(!("deepfake_exposure_channels" in responses) && !("political_deepfake_exposure" in responses),
+                "Hidden follow-up answers are excluded");
+            document.querySelector("#intro-back").click();
+            require(introStep === 1 && document.querySelector("#demographic-age").value === "25",
+                "Back preserves demographic answers");
+            clickNext();
+
+            document.querySelector('input[name="demographic-deepfake_exposure_frequency"][value="Never"]').click();
+            clickNext();
             participantSession.condition = 1;
             participantSession.videoSets = { pre: "A", post: "B" };
             renderAssessmentStage("pre");
@@ -229,7 +285,7 @@ async function run() {
         );
         await waitForHttp(`http://127.0.0.1:${serverPort}/`);
         chrome = spawn(
-            "google-chrome",
+            process.env.CHROME_BIN || "google-chrome",
             [
                 "--headless=new",
                 "--no-sandbox",

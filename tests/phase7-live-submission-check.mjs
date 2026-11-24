@@ -192,9 +192,10 @@ async function run() {
                 participantSession.demographics = {
                     age: 25,
                     gender: "Prefer not to say",
-                    education_level: "Bachelor's degree",
-                    ai_content_familiarity: "Moderately familiar",
-                    deepfake_experience: "Limited experience"
+                    education_level: "University degree",
+                    political_leaning: 4,
+                    ai_sentiment: "Unsure",
+                    deepfake_exposure_frequency: "Never"
                 };
                 participantSession.condition = 1;
                 participantSession.videoSets = { pre: "A", post: "B" };

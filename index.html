@@ -48,7 +48,7 @@
                 </li>
                 <li class="progress-step" data-stage-id="pre-assessment">
                     <span class="progress-marker" aria-hidden="true">02</span>
-                    <span class="progress-label">Pre-assessment</span>
+                    <span class="progress-label">Round-1</span>
                 </li>
                 <li class="progress-step" data-stage-id="learning">
                     <span class="progress-marker" aria-hidden="true">03</span>
@@ -56,7 +56,7 @@
                 </li>
                 <li class="progress-step" data-stage-id="post-assessment">
                     <span class="progress-marker" aria-hidden="true">04</span>
-                    <span class="progress-label">Post-assessment</span>
+                    <span class="progress-label">Round-2</span>
                 </li>
                 <li class="progress-step" data-stage-id="results">
                     <span class="progress-marker" aria-hidden="true">05</span>
@@ -75,7 +75,7 @@
             >
                 <h2 id="welcome-title" class="visually-hidden" tabindex="-1">Welcome</h2>
 
-                <div class="content-section">
+                <div class="content-section" id="welcome-introduction">
                     <div class="study-introduction">
                         <p><strong>Can you tell what's real?</strong></p>
                         <p>
@@ -107,7 +107,7 @@
                     </p>
 
                     <div class="welcome-grid">
-                        <section class="content-section" aria-labelledby="consent-heading">
+                        <section id="welcome-consent" class="content-section" aria-labelledby="consent-heading">
                             <div class="section-heading">
                                 <h3 id="consent-heading">Participant Consent</h3>
                                 <p>
@@ -136,9 +136,9 @@
                             </div>
                         </section>
 
-                        <section class="content-section" aria-labelledby="demographics-heading">
+                        <section id="questionnaire-section" class="content-section" aria-labelledby="demographics-heading" hidden>
                             <div class="section-heading">
-                                <h3 id="demographics-heading">Demographic Questionnaire</h3>
+                                <h3 id="demographics-heading" tabindex="-1">About you</h3>
                                 <p>Complete each required question before continuing.</p>
                             </div>
                             <div
@@ -158,14 +158,16 @@
                         Please correct the highlighted fields before continuing.
                     </p>
 
-                    <div class="screen-actions">
+                    <div class="screen-actions screen-actions-split intro-actions">
+                        <button id="intro-back" class="button button-secondary" type="button" hidden>Back</button>
+                        <p id="intro-progress" class="assessment-position" aria-live="polite">Step 1 of 3</p>
                         <button
                             id="start-experiment"
                             class="button button-primary"
                             type="submit"
                             disabled
                         >
-                            Start Experiment
+                            Continue
                         </button>
                     </div>
                 </form>
@@ -181,7 +183,7 @@
                 hidden
             >
                 <h2 id="assessment-title" class="visually-hidden" tabindex="-1">
-                    Pre-Assessment
+                    Round-1
                 </h2>
 
                 <form id="assessment-form" class="assessment-form" novalidate>
@@ -406,7 +408,7 @@
                 <div class="results-intro">
                     <h2 id="results-title" tabindex="-1">Study complete</h2>
                     <p>
-                        Your pre-assessment and post-assessment performance are
+                        Your Round-1 and Round-2 performance are
                         compared below.
                     </p>
                 </div>
@@ -416,7 +418,7 @@
                         class="performance-panel"
                         aria-labelledby="pre-performance-heading"
                     >
-                        <h3 id="pre-performance-heading">Pre-assessment</h3>
+                        <h3 id="pre-performance-heading">Round-1</h3>
                         <p class="performance-primary">
                             <span id="pre-accuracy" class="metric-value">&mdash;</span>
                             <span>accuracy</span>
@@ -437,7 +439,7 @@
                         class="performance-panel"
                         aria-labelledby="post-performance-heading"
                     >
-                        <h3 id="post-performance-heading">Post-assessment</h3>
+                        <h3 id="post-performance-heading">Round-2</h3>
                         <p class="performance-primary">
                             <span id="post-accuracy" class="metric-value">&mdash;</span>
                             <span>accuracy</span>

@@ -1,0 +1,144 @@
+{
+    "consentStatement": "Deepfake Detective is a university course project investigating how people recognize AI-generated political videos. Participation involves watching videos, answering questions, and completing a short educational activity. Participation is voluntary, and responses will be used for the course project.",
+    "questions": [
+        {
+            "id": "age",
+            "label": "Age",
+            "type": "number",
+            "required": true,
+            "min": 15,
+            "max": 100,
+            "section": "demographics"
+        },
+        {
+            "id": "gender",
+            "label": "Gender",
+            "type": "select",
+            "required": true,
+            "options": [
+                "Woman",
+                "Man",
+                "Non-binary",
+                "Prefer not to say"
+            ],
+            "section": "demographics"
+        },
+        {
+            "id": "education_level",
+            "label": "What is the highest level of education you have completed?",
+            "type": "select",
+            "required": true,
+            "options": [
+                "Compulsory school or less",
+                "Higher secondary school",
+                "Apprenticeship or technical school program at secondary level",
+                "Higher professional diploma",
+                "University degree",
+                "Other qualification",
+                "Prefer not to say"
+            ],
+            "section": "demographics"
+        },
+        {
+            "id": "political_leaning",
+            "label": "Thinking about politics in the country you live, where would you place your own views?",
+            "type": "range",
+            "required": true,
+            "options": [
+                "Unsure",
+                "I don’t use these labels",
+                "Prefer not to say"
+            ],
+            "section": "demographics",
+            "min": 1,
+            "max": 7,
+            "minLabel": "Left",
+            "maxLabel": "Right",
+            "midpointLabel": "Centre",
+            "subsection": "Politics",
+            "helpText": "Click or tap the scale to select your position, or choose an option below."
+        },
+        {
+            "id": "ai_sentiment",
+            "label": "How do you feel about the growing use of artificial intelligence in everyday life?",
+            "type": "radio",
+            "required": true,
+            "options": [
+                "More concerned than excited",
+                "Equally concerned and excited",
+                "More excited than concerned",
+                "Neither concerned nor excited",
+                "Unsure"
+            ],
+            "section": "ai"
+        },
+        {
+            "id": "deepfake_exposure_frequency",
+            "label": "In the six months before this study, how many times did you see or hear something online that you thought might be a deepfake?",
+            "type": "radio",
+            "required": true,
+            "options": [
+                "Never",
+                "Once",
+                "2–5 times",
+                "6 or more times",
+                "Unsure"
+            ],
+            "section": "ai",
+            "subsection": "Deepfakes",
+            "subsectionDescription": "A deepfake is video or audio created or altered using AI to make someone appear to say or do something they did not actually say or do."
+        },
+        {
+            "id": "deepfake_exposure_channels",
+            "label": "In the past six months, where did you see or hear something you thought might be a deepfake?",
+            "helpText": "Select all that apply.",
+            "type": "checkbox",
+            "required": true,
+            "options": [
+                "Instagram",
+                "TikTok",
+                "YouTube",
+                "Facebook",
+                "X (Twitter)",
+                "WhatsApp",
+                "Telegram",
+                "Signal",
+                "News website or app",
+                "Other",
+                "I don’t remember"
+            ],
+            "section": "ai",
+            "showIf": {
+                "questionId": "deepfake_exposure_frequency",
+                "values": [
+                    "Once",
+                    "2–5 times",
+                    "6 or more times",
+                    "Unsure"
+                ]
+            },
+            "exclusiveOption": "I don’t remember"
+        },
+        {
+            "id": "political_deepfake_exposure",
+            "label": "Did any of those suspected deepfakes involve a politician or a political event?",
+            "type": "radio",
+            "required": true,
+            "options": [
+                "Yes",
+                "No",
+                "Unsure or can’t remember"
+            ],
+            "section": "ai",
+            "showIf": {
+                "questionId": "deepfake_exposure_frequency",
+                "values": [
+                    "Once",
+                    "2–5 times",
+                    "6 or more times",
+                    "Unsure"
+                ]
+            }
+        }
+    ]
+}
