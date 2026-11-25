@@ -58,8 +58,12 @@
                     <span class="progress-marker" aria-hidden="true">04</span>
                     <span class="progress-label">Round-2</span>
                 </li>
-                <li class="progress-step" data-stage-id="results">
+                <li class="progress-step" data-stage-id="submission">
                     <span class="progress-marker" aria-hidden="true">05</span>
+                    <span class="progress-label">Submission</span>
+                </li>
+                <li class="progress-step" data-stage-id="results">
+                    <span class="progress-marker" aria-hidden="true">06</span>
                     <span class="progress-label">Results</span>
                 </li>
             </ol>
@@ -416,6 +420,66 @@
             </section>
 
             <section
+                id="submission-screen"
+                class="screen"
+                data-screen="submission"
+                aria-labelledby="submission-title"
+                aria-busy="false"
+                tabindex="-1"
+                hidden
+            >
+                <div class="submission-intro">
+                    <h2 id="submission-title" tabindex="-1">Experiment Complete</h2>
+                    <p id="submission-description">
+                        You have completed all parts of the experiment. Please submit
+                        your responses to view your results.
+                    </p>
+                </div>
+
+                <section
+                    class="submission-panel"
+                    aria-labelledby="submission-action-heading"
+                >
+                    <h3 id="submission-action-heading">Submit responses</h3>
+                    <div class="submission-status-row">
+                        <span
+                            id="submission-loading"
+                            class="submission-loading"
+                            aria-hidden="true"
+                            hidden
+                        ></span>
+                        <p
+                            id="submission-status"
+                            role="status"
+                            aria-live="polite"
+                            aria-atomic="true"
+                        >
+                            Your results have not been submitted.
+                        </p>
+                    </div>
+                    <div class="submission-actions">
+                        <button
+                            id="submit-results"
+                            class="button button-primary"
+                            type="button"
+                            aria-describedby="submission-status"
+                        >
+                            Submit Results
+                        </button>
+                        <button
+                            id="view-results"
+                            class="button button-primary"
+                            type="button"
+                            aria-describedby="submission-status"
+                            hidden
+                        >
+                            View Results
+                        </button>
+                    </div>
+                </section>
+            </section>
+
+            <section
                 id="results-screen"
                 class="screen"
                 data-screen="results"
@@ -489,38 +553,16 @@
                     </dl>
                 </section>
 
-                <section class="submission-section" aria-labelledby="submission-heading">
-                    <div>
-                        <h3 id="submission-heading">Submit results</h3>
-                        <p
-                            id="submission-status"
-                            role="status"
-                            aria-live="polite"
-                            aria-atomic="true"
-                        >
-                            Your results have not been submitted.
-                        </p>
-                    </div>
-                    <div class="submission-actions">
-                        <button
-                            id="new-participant"
-                            class="button button-secondary"
-                            type="button"
-                            aria-describedby="submission-status"
-                            disabled
-                        >
-                            New Participant
-                        </button>
-                        <button
-                            id="submit-results"
-                            class="button button-primary"
-                            type="button"
-                            aria-describedby="submission-status"
-                        >
-                            Submit Results
-                        </button>
-                    </div>
-                </section>
+                <div class="screen-actions results-actions">
+                    <button
+                        id="new-participant"
+                        class="button button-secondary"
+                        type="button"
+                        disabled
+                    >
+                        New Participant
+                    </button>
+                </div>
             </section>
         </main>
 

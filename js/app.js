@@ -19,7 +19,11 @@ const stages = [
         screenId: "assessment-screen",
         assessmentMode: "post",
         title: "Round-2",
-        nextLabel: "View Results",
+        nextLabel: "Continue to Submission",
+    },
+    {
+        id: "submission",
+        screenId: "submission-screen",
     },
     {
         id: "results",
@@ -119,7 +123,10 @@ const postConfidence = document.querySelector("#post-confidence");
 const accuracyDifference = document.querySelector("#accuracy-difference");
 const confidenceComparison = document.querySelector("#confidence-comparison");
 const submissionStatus = document.querySelector("#submission-status");
+const submissionScreen = document.querySelector("#submission-screen");
+const submissionLoading = document.querySelector("#submission-loading");
 const submitResultsButton = document.querySelector("#submit-results");
+const viewResultsButton = document.querySelector("#view-results");
 const newParticipantButton = document.querySelector("#new-participant");
 const supportedQuestionTypes = new Set([
     "text",
@@ -175,7 +182,14 @@ const participantSession = {
 };
 
 function showStage(stageIndex, moveFocus = true) {
-    const stage = stages[stageIndex];
+    let stage = stages[stageIndex];
+    if (
+        stage?.id === "results" &&
+        (submissionState !== "success" || !participantSession.participantId)
+    ) {
+        stageIndex = stages.findIndex((candidate) => candidate.id === "submission");
+        stage = stages[stageIndex];
+    }
     const activeScreen = document.querySelector(`#${stage.screenId}`);
 
     currentStageIndex = stageIndex;
@@ -207,6 +221,10 @@ function showStage(stageIndex, moveFocus = true) {
         renderLearningStage();
     } else {
         learningMediaVideo.pause();
+    }
+
+    if (stage.id === "submission") {
+        renderSubmissionStage();
     }
 
     if (stage.id === "results") {
@@ -1379,21 +1397,40 @@ function setSubmissionState(state) {
     submitResultsButton.hidden = state === "success";
     submitResultsButton.disabled = state === "submitting" || state === "success";
     submitResultsButton.textContent =
-        state === "submitting" ? "Submitting..." : "Submit Results";
+        state === "submitting"
+            ? "Submitting..."
+            : state === "failure"
+              ? "Retry Submission"
+              : "Submit Results";
+    viewResultsButton.hidden = state !== "success";
+    viewResultsButton.disabled = state !== "success";
+    submissionLoading.hidden = state !== "submitting";
+    submissionScreen.setAttribute(
+        "aria-busy",
+        state === "submitting" ? "true" : "false",
+    );
     newParticipantButton.disabled = state !== "success";
 
     if (state === "submitting") {
-        submissionStatus.textContent = "Submitting your responses. Please wait.";
+        submissionStatus.textContent = "Submitting your responses...";
     } else if (state === "success") {
         submissionStatus.textContent =
             "Your responses have been saved successfully.";
-        newParticipantButton.focus();
+        viewResultsButton.focus();
     } else if (state === "failure") {
         submissionStatus.textContent =
             "We couldn't confirm that your responses were saved. Please try again.";
     } else {
         submissionStatus.textContent = "Your results have not been submitted.";
     }
+}
+
+function renderSubmissionStage() {
+    setSubmissionState(submissionState);
+}
+
+function canAccessResults() {
+    return submissionState === "success" && Boolean(participantSession.participantId);
 }
 
 function verifyParticipantSaved(
@@ -1566,6 +1603,11 @@ function formatAccuracyDifference(value) {
 }
 
 function renderResults() {
+    if (!canAccessResults()) {
+        showStage(stages.findIndex((stage) => stage.id === "submission"), false);
+        return;
+    }
+
     const performance = calculateExperimentPerformance();
 
     preCorrect.textContent = `${performance.pre.correctClassifications}/${performance.pre.totalClassifications}`;
@@ -1584,6 +1626,21 @@ function renderResults() {
     confidenceComparison.textContent = `${formatPercentage(
         performance.pre.averageConfidencePercent,
     )} → ${formatPercentage(performance.post.averageConfidencePercent)}`;
+}
+
+function clearResultsDisplay() {
+    [
+        preCorrect,
+        preAccuracy,
+        preConfidence,
+        postCorrect,
+        postAccuracy,
+        postConfidence,
+        accuracyDifference,
+        confidenceComparison,
+    ].forEach((element) => {
+        element.textContent = "—";
+    });
 }
 
 function resetExperimentSession() {
@@ -1630,6 +1687,7 @@ function resetExperimentSession() {
     assessmentVideo.load();
     clearLearningMedia();
     resetSubmissionState();
+    clearResultsDisplay();
     showStage(0);
 }
 
@@ -2550,6 +2608,14 @@ assessmentForm.addEventListener("change", (event) => {
 learningCheckAnswer.addEventListener("click", handleLearningCheckAnswer);
 learningContinue.addEventListener("click", handleLearningContinue);
 submitResultsButton.addEventListener("click", handleResultsSubmission);
+viewResultsButton.addEventListener("click", () => {
+    if (!canAccessResults()) {
+        renderSubmissionStage();
+        return;
+    }
+
+    showStage(stages.findIndex((stage) => stage.id === "results"));
+});
 newParticipantButton.addEventListener("click", () => {
     if (submissionState === "success") {
         resetExperimentSession();

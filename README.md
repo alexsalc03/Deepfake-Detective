@@ -7,7 +7,8 @@ improve people's ability to recognize political deepfakes.
 The repository currently contains the application interface, stage navigation,
 the configurable demographic questionnaire and consent gate, the reusable
 pre/post video assessment, the JSON-driven interactive learning stage, the
-pre/post Results comparison, and verified result submission to Google Sheets.
+pre/post Results comparison, and verified result submission to Google Sheets
+before Results are shown.
 
 ## Technology stack
 
@@ -42,7 +43,8 @@ deepfake-detective/
 │   ├── gsbackend-contract-check.mjs
 │   ├── phase5-learning-check.mjs
 │   ├── phase6-results-check.mjs
-│   └── phase7-live-submission-check.mjs
+│   ├── phase7-live-submission-check.mjs
+│   └── phase10-submission-gate-check.mjs
 ├── .gitignore
 └── README.md
 ```
@@ -74,7 +76,8 @@ files consistently.
 2. Round-1
 3. Learning
 4. Round-2
-5. Results
+5. Submission
+6. Results
 
 The welcome stage loads the demographic questionnaire and consent statement
 from `data/pre-questionnaire.json`. Required answers and explicit consent must be
@@ -98,7 +101,7 @@ Round-1 video moves to the Learning stage. Learning first presents the configure
 authentic/deepfake comparison and five concepts, then shows four quiz questions
 one at a time. Each answer must be checked before the next question is available.
 After all four answers are saved, the final module opens Round-2; the last
-Round-2 video moves to Results.
+Round-2 video moves to Submission.
 
 Participant state is held in the existing `participantSession` object in
 `js/app.js`. It includes the participant ID, consent and demographic responses,
@@ -108,15 +111,19 @@ checked quiz answers, and whether all modules are complete. Nothing is persisted
 to localStorage; completed results are sent only when the participant selects
 Submit Results.
 
+The Submission stage prepares a JSON-serializable payload with the participant,
+demographic, condition, assessment, learning, and calculated performance data.
+Submit Results sends that payload to the configured Google Apps Script Web App
+and then verifies the participant ID through its JSONP GET endpoint. The
+interface reports success only after positive verification. Failed or
+unconfirmed requests keep the participant session in memory and can be retried
+with the same participant ID and payload.
+
 The Results stage calculates correct classifications, accuracy, and average
 confidence from the in-memory assessment answers and the labels in
-`data/videos.json`. It prepares a JSON-serializable submission payload with the
-participant, demographic, condition, assessment, learning, and calculated
-performance data. Submit Results sends that payload to the configured Google
-Apps Script Web App and then verifies the participant ID through its JSONP GET
-endpoint. The interface reports success only after positive verification.
-Failed or unconfirmed requests keep the participant session in memory and can
-be retried. New Participant remains unavailable until verification succeeds.
+`data/videos.json`. Results are not rendered or accessible until submission
+verification succeeds. New Participant resets the participant session and
+submission status before returning to Welcome.
 
 ## Research content
 
