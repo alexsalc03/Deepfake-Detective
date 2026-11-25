@@ -1,30 +1,10 @@
 [
-    {
-        "id": "ex1",
-        "file": "media/ex.webm",
-        "label": "real",
-        "set": "A",
-        "source": ""
-    },
-    {
-        "id": "ex2",
-        "file": "media/ex2.webm",
-        "label": "fake",
-        "set": "A",
-        "source": ""
-    },
-    {
-        "id": "ex3",
-        "file": "media/ex3.webm",
-        "label": "fake",
-        "set": "B",
-        "source": ""
-    },
-    {
-        "id": "ex4",
-        "file": "media/ex4.webm",
-        "label": "real",
-        "set": "B",
-        "source": ""
-    }
+    { "id": "t-01", "file": "media/7283aa2c7036fc65d1744cd5a1588d461391b9710a9f21f9f0d2f1733e41c60c.mp4", "label": "fake", "set": "A", "source": "Groh et al. (2024), doi:10.5281/zenodo.12709665" },
+    { "id": "t-02", "file": "media/bed17416f9881bcb2fd76daee9debd606926f25886347d2938e3ee243f454d4c.mp4", "label": "real", "set": "A", "source": "Groh et al. (2024), doi:10.5281/zenodo.12709665" },
+    { "id": "b-01", "file": "media/ede5d6fb7ebf92153a672f76d9d217adaf458208b18647238e664025626b33ac.mp4", "label": "fake", "set": "A", "source": "Groh et al. (2024), doi:10.5281/zenodo.12709665" },
+    { "id": "b-02", "file": "media/441aaf39e01b6842397a0ebe6a91615504c59959741245f04b16b19b8f0b762e.mp4", "label": "real", "set": "A", "source": "Groh et al. (2024), doi:10.5281/zenodo.12709665" },
+    { "id": "t-03", "file": "media/ad2fd162e8b0b0656c16de318e868b02362e9585b6d27f3ed320f1eeac2f9def.mp4", "label": "fake", "set": "B", "source": "Groh et al. (2024), doi:10.5281/zenodo.12709665" },
+    { "id": "t-04", "file": "media/9959b82d6db89f607df216237d85c264db9f9e8a06c646e457a605945ffd068f.mp4", "label": "real", "set": "B", "source": "Groh et al. (2024), doi:10.5281/zenodo.12709665" },
+    { "id": "b-03", "file": "media/d15962d4870cd162cd76b8c0ac9d2b34854dafb2a856ba66d1a1e5dd0ae81e34.mp4", "label": "fake", "set": "B", "source": "Groh et al. (2024), doi:10.5281/zenodo.12709665" },
+    { "id": "b-04", "file": "media/3bcd246c54d3371d160e0b4581142ef8c5c8f6cbbbbb9e2ce394e16c82f08dea.mp4", "label": "real", "set": "B", "source": "Groh et al. (2024), doi:10.5281/zenodo.12709665" }
 ]
