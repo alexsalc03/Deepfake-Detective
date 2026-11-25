@@ -35,11 +35,11 @@ deepfake-detective/
 │   ├── videos.json
 │   └── lessons.json
 ├── media/
-│   ├── ex.webm
-│   ├── ex2.webm
-│   ├── ex3.webm
-│   └── ex4.webm
+│   └── *.mp4 (8 assessment videos and 2 learning videos)
+├── gsscript/
+│   └── gsbackend.gs
 ├── tests/
+│   ├── gsbackend-contract-check.mjs
 │   ├── phase5-learning-check.mjs
 │   ├── phase6-results-check.mjs
 │   └── phase7-live-submission-check.mjs
@@ -51,7 +51,7 @@ deepfake-detective/
 - `css/` contains the application styles.
 - `js/` contains the vanilla JavaScript application code.
 - `data/` contains JSON content loaded by the application.
-- `media/` contains the local videos used by the assessment.
+- `media/` contains separate local videos for the assessments and Learning.
 - `tests/` contains browser-level checks that use local Chrome.
 
 ## Run locally
@@ -92,10 +92,12 @@ conditions:
 
 Each assessment shows one configured video at a time. A submitted answer is
 stored in the in-memory participant session and the assessment advances only
-after all required responses are valid. The last Round-1 video moves to
-the Learning stage. Learning shows one module at a time in the order configured
-in `data/lessons.json`. A configured quiz must be checked before a participant
-can continue. The final module opens the Round-2, and the last
+after the browser has loaded the current video's metadata and all required
+responses are valid. A video loading error keeps submission disabled. The last
+Round-1 video moves to the Learning stage. Learning first presents the configured
+authentic/deepfake comparison and five concepts, then shows four quiz questions
+one at a time. Each answer must be checked before the next question is available.
+After all four answers are saved, the final module opens Round-2; the last
 Round-2 video moves to Results.
 
 Participant state is held in the existing `participantSession` object in
@@ -118,17 +120,14 @@ be retried. New Participant remains unavailable until verification succeeds.
 
 ## Research content
 
-The assessment and video files currently contain temporary test content. They
-must be replaced or reviewed before they are used for research conclusions. The
-temporary `real`/`fake` labels do not establish the actual authenticity of the
-videos. The lesson file contains two short placeholder modules and must be
-replaced with approved educational content.
+The assessment uses eight local MP4 videos referenced from the configured
+research dataset. Their metadata, set assignment, and `real`/`fake` labels live
+in `data/videos.json` and must be reviewed by the research team before the data
+is used for research conclusions. The two Learning videos are configured only
+in `data/lessons.json` and remain separate from the assessment sets.
 
 The application shows an unavailable/configuration message instead of
 fabricating content when assessment or lesson files are empty or invalid.
-
-`data/pre-questionnaire.json` contains temporary example demographic questions and a
-short consent statement. These will be replaced with final research content.
 
 `data/pre-questionnaire.json` uses this structure:
 
@@ -171,42 +170,55 @@ and selecting another choice clears it.
 
 ### Learning configuration
 
-`data/lessons.json` is an array. Array order defines the module sequence.
-`media` and `quiz` are optional for each module.
+`data/lessons.json` is an array. Array order defines the module sequence. The
+current configuration uses a `content` module followed by a `quiz` module.
 
 ```json
 [
     {
-        "id": "unique_module_id",
-        "title": "Module title",
-        "content": [
-            "First approved text paragraph.",
-            "Second approved text paragraph."
-        ],
-        "media": {
-            "type": "image | video",
-            "src": "media/example.webm",
-            "alt": "Accessible description of the media"
+        "id": "content_module_id",
+        "type": "content",
+        "title": "Content module title",
+        "introduction": "Approved introduction.",
+        "comparisonVideos": {
+            "real": { "label": "Authentic Video", "file": "media/real.mp4" },
+            "fake": { "label": "Deepfake Video", "file": "media/fake.mp4" }
         },
-        "quiz": {
-            "question": "Single-choice question text",
-            "options": [
-                { "value": "option_a", "label": "First answer" },
-                { "value": "option_b", "label": "Second answer" }
-            ],
-            "correctAnswer": "option_a",
-            "explanation": "Explanation shown after the answer is checked."
-        }
+        "comparisonNote": "Approved comparison note.",
+        "contentHeading": "Section heading",
+        "clues": [
+            { "id": "clue_id", "title": "Concept title", "text": "Approved explanation." }
+        ]
+    },
+    {
+        "id": "quiz_module_id",
+        "type": "quiz",
+        "title": "Quiz module title",
+        "contentHeading": "Section heading",
+        "questions": [
+            {
+                "id": "q1",
+                "question": "Question text",
+                "correctOptionId": "a",
+                "feedback": "Feedback shown after submission.",
+                "options": [
+                    { "id": "a", "text": "First answer" },
+                    { "id": "b", "text": "Second answer" },
+                    { "id": "c", "text": "Third answer" }
+                ]
+            }
+        ]
     }
 ]
 ```
 
-- Module IDs must be unique, and `content` must contain at least one non-empty
-  paragraph.
-- Image and video media require `type`, `src`, and `alt`. Videos must use a local
-  file path. The configured source aspect ratio is preserved.
-- Quiz options require at least two unique `value` fields. `correctAnswer` must
-  match one option value.
+- Module, concept, question, and option IDs must be unique within their scope.
+- A content module requires both local comparison video paths, a comparison
+  note, and at least one concept. Only the selected video is loaded.
+- Each quiz question requires exactly three options. `correctOptionId` must
+  match one option ID, and feedback is shown only after submission.
+- Quiz answers are stored by question ID in `learning.quizAnswers`; the current
+  module records all four answers as `q1` through `q4`.
 - An empty or invalid module list shows a configuration message and leaves
   Learning incomplete and blocked.
 
@@ -220,28 +232,29 @@ video cannot appear in both assessments.
 [
     {
         "id": "unique_video_id",
-        "file": "media/video-file.webm",
+        "file": "media/video-file.mp4",
         "label": "real",
         "set": "A",
-        "source": ""
+        "source": "Dataset citation"
     }
 ]
 ```
 
 - `file` must be a local path, not an external URL.
 - `label` must be `real` or `fake`.
-- `set` must be `A` or `B`, and both sets need at least one video.
+- `set` must be `A` or `B`. The current study design uses four videos in each
+  set, balanced between two `real` and two `fake` labels.
 - `source` and `label` are available in the configuration but are not displayed
   during the assessment.
-- `source` may be an empty string while temporary test content is in use.
+- `source` may be an empty string only while temporary test content is in use.
 
-The current temporary video mapping is:
+The current video mapping is:
 
-- Set A: `ex1` → `media/ex.webm`, `ex2` → `media/ex2.webm`
-- Set B: `ex3` → `media/ex3.webm`, `ex4` → `media/ex4.webm`
+- Set A: `t-01` (fake), `t-02` (real), `b-01` (fake), `b-02` (real)
+- Set B: `t-03` (fake), `t-04` (real), `b-03` (fake), `b-04` (real)
 
-The first file is currently named `ex.webm`; the configured video ID remains
-`ex1`.
+The corresponding local MP4 paths and dataset citations are defined in
+`data/videos.json`.
 
 ### Assessment configuration
 
@@ -298,6 +311,7 @@ With Google Chrome installed, run:
 ```bash
 node tests/phase5-learning-check.mjs
 node tests/phase6-results-check.mjs
+node tests/gsbackend-contract-check.mjs
 ```
 
 The scripts start temporary local server and Chrome processes. Together they

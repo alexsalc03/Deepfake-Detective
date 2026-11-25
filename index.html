@@ -327,7 +327,11 @@
                         <div id="learning-module-content" class="learning-module-content"></div>
 
                         <figure id="learning-media" class="learning-media" hidden>
-                            <img id="learning-media-image" alt="" hidden>
+                            <div
+                                id="learning-video-selector"
+                                class="learning-video-selector"
+                                aria-label="Select a comparison video"
+                            ></div>
                             <video
                                 id="learning-media-video"
                                 controls
@@ -344,7 +348,21 @@
                             >
                                 This learning media could not be loaded.
                             </p>
+                            <figcaption
+                                id="learning-comparison-note"
+                                class="learning-comparison-note"
+                            ></figcaption>
                         </figure>
+
+                        <section
+                            id="learning-concepts"
+                            class="learning-concepts"
+                            aria-labelledby="learning-content-heading"
+                            hidden
+                        >
+                            <h4 id="learning-content-heading"></h4>
+                            <div id="learning-clues" class="learning-clues"></div>
+                        </section>
 
                         <section
                             id="learning-quiz"

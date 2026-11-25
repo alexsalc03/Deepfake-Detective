@@ -33,6 +33,29 @@ function createSheet() {
                         rows[row + index - 2] = [...value];
                     });
                 },
+                createTextFinder(searchText) {
+                    let matchEntireCell = false;
+                    return {
+                        matchEntireCell(value) {
+                            matchEntireCell = value;
+                            return this;
+                        },
+                        findNext() {
+                            const values = Array.from(
+                                { length: rowCount },
+                                (_, rowOffset) =>
+                                    rows[row + rowOffset - 2]?.[column - 1] ?? "",
+                            );
+                            return values.some((value) =>
+                                matchEntireCell
+                                    ? value === searchText
+                                    : String(value).includes(searchText),
+                            )
+                                ? {}
+                                : null;
+                        },
+                    };
+                },
             };
         },
         deleteRow(row) {
@@ -72,12 +95,19 @@ function loadBackend() {
         },
         ContentService: {
             MimeType: { JSON: "json", JAVASCRIPT: "javascript" },
-            createTextOutput: () => ({ setMimeType() { return this; } }),
+            createTextOutput: (content = "") => ({
+                content,
+                mimeType: null,
+                setMimeType(mimeType) {
+                    this.mimeType = mimeType;
+                    return this;
+                },
+            }),
         },
     };
 
     vm.runInNewContext(
-        `${backendSource}\nthis.__backend = { PARTICIPANT_HEADERS, saveSubmission, testSubmission };`,
+        `${backendSource}\nthis.__backend = { PARTICIPANT_HEADERS, saveSubmission, testSubmission, doGet };`,
         context,
     );
 
@@ -127,10 +157,10 @@ function currentPayload() {
         },
         learning: {
             completedModuleIds: [
-                "placeholder-module-1",
-                "placeholder-module-2",
+                "deepfake-clues",
+                "check-understanding",
             ],
-            quizAnswers: { "placeholder-module-2": "a" },
+            quizAnswers: { q1: "c", q2: "b", q3: "a", q4: "c" },
             isComplete: true,
         },
         performance: {
@@ -155,7 +185,8 @@ function currentPayload() {
     const { PARTICIPANT_HEADERS, saveSubmission, participants, responses } =
         loadBackend();
 
-    saveSubmission(currentPayload());
+    const firstResult = saveSubmission(currentPayload());
+    const duplicateResult = saveSubmission(currentPayload());
 
     assert.deepEqual(
         Array.from(PARTICIPANT_HEADERS.slice(5, 10)),
@@ -184,11 +215,54 @@ function currentPayload() {
         PARTICIPANT_HEADERS.length,
         "participant values align with their headers",
     );
+    assert.equal(
+        participants.rows[0][13],
+        '["deepfake-clues","check-understanding"]',
+        "both current learning modules are serialized",
+    );
+    assert.equal(
+        participants.rows[0][14],
+        '{"q1":"c","q2":"b","q3":"a","q4":"c"}',
+        "all four quiz answers are serialized into the existing JSON column",
+    );
     assert.equal(responses.rows.length, 8, "all eight video responses are saved");
+    assert.deepEqual(
+        { ...firstResult },
+        { success: true, duplicate: false, participantId: "CONTRACT_TEST" },
+        "the first submission is saved",
+    );
+    assert.deepEqual(
+        { ...duplicateResult },
+        { success: true, duplicate: true, participantId: "CONTRACT_TEST" },
+        "duplicate participant submissions are acknowledged without extra rows",
+    );
+    assert.equal(participants.rows.length, 1, "duplicates do not add participant rows");
+    assert.equal(responses.rows.length, 8, "duplicates do not add response rows");
+
+    const { doGet } = loadBackend();
+    const unsavedLookup = doGet({
+        parameter: { participantId: "CONTRACT_TEST", callback: "verifyResult" },
+    });
+    assert.equal(
+        unsavedLookup.content,
+        'verifyResult({"participantId":"CONTRACT_TEST","saved":false});',
+        "JSONP verification reports an unsaved participant without personal data",
+    );
+
+    const savedBackend = loadBackend();
+    savedBackend.saveSubmission(currentPayload());
+    const savedLookup = savedBackend.doGet({
+        parameter: { participantId: "CONTRACT_TEST", callback: "verifyResult" },
+    });
+    assert.equal(
+        savedLookup.content,
+        'verifyResult({"participantId":"CONTRACT_TEST","saved":true});',
+        "JSONP verification reports a saved participant",
+    );
 }
 
 {
-    const { testSubmission, responses } = loadBackend();
+    const { testSubmission, participants, responses } = loadBackend();
 
     testSubmission();
 
@@ -196,6 +270,16 @@ function currentPayload() {
         responses.rows.map((row) => row[2]),
         ["t-01", "t-02", "b-01", "b-02", "t-03", "t-04", "b-03", "b-04"],
         "the manual Apps Script test uses the current video IDs",
+    );
+    assert.equal(
+        participants.rows[0][13],
+        '["deepfake-clues","check-understanding"]',
+        "the manual Apps Script test uses the current module IDs",
+    );
+    assert.equal(
+        participants.rows[0][14],
+        '{"q1":"c","q2":"b","q3":"a","q4":"c"}',
+        "the manual Apps Script test includes all four quiz answers",
     );
 }
 

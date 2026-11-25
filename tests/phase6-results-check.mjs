@@ -234,16 +234,23 @@ async function completeLearning(client) {
         "document.querySelector('#learning-module-progress').textContent.includes('Module 2 of 2')",
         "second learning module",
     );
-    await client.evaluate(`
-        (() => {
-            document.querySelector(
-                '#learning-quiz input[name="learning-quiz-answer"][value="a"]'
-            ).click();
-            document.querySelector("#learning-check-answer").click();
-            document.querySelector("#learning-continue").click();
-            return true;
-        })()
-    `);
+    for (const [index, answer] of ["a", "b", "a", "c"].entries()) {
+        await waitFor(
+            client,
+            `document.querySelector("#learning-question-progress").textContent.includes("Question ${index + 1} of 4")`,
+            `learning question ${index + 1}`,
+        );
+        await client.evaluate(`
+            (() => {
+                document.querySelector(
+                    '#learning-quiz input[name="learning-quiz-answer"][value="${answer}"]'
+                ).click();
+                document.querySelector("#learning-check-answer").click();
+                document.querySelector("#learning-continue").click();
+                return true;
+            })()
+        `);
+    }
     await waitFor(
         client,
         "document.body.dataset.activeStage === 'post-assessment'",
@@ -338,22 +345,78 @@ async function run() {
             "application content",
         );
 
+        const conditionAssignments = await client.evaluate(`
+            (() => {
+                const originalRandom = Math.random;
+                participantSession.condition = null;
+                participantSession.videoSets = { pre: null, post: null };
+                Math.random = () => 0.1;
+                assignParticipantCondition();
+                const conditionOne = {
+                    condition: participantSession.condition,
+                    videoSets: { ...participantSession.videoSets }
+                };
+                participantSession.condition = null;
+                participantSession.videoSets = { pre: null, post: null };
+                Math.random = () => 0.9;
+                assignParticipantCondition();
+                const conditionTwo = {
+                    condition: participantSession.condition,
+                    videoSets: { ...participantSession.videoSets }
+                };
+                Math.random = originalRandom;
+                participantSession.condition = null;
+                participantSession.videoSets = { pre: null, post: null };
+                return { conditionOne, conditionTwo };
+            })()
+        `);
+        assert.deepEqual(conditionAssignments, {
+            conditionOne: { condition: 1, videoSets: { pre: "A", post: "B" } },
+            conditionTwo: { condition: 2, videoSets: { pre: "B", post: "A" } },
+        });
+
         await completeDemographics(client);
-        await submitAssessmentAnswer(client, "real", 40);
-        await waitFor(
-            client,
-            "participantSession.assessmentProgress.pre.videoIndex === 1",
-            "second pre-assessment video",
+        const assignedVideoCounts = await client.evaluate(`
+            ({
+                pre: getAssessmentVideos("pre").length,
+                post: getAssessmentVideos("post").length
+            })
+        `);
+        assert.deepEqual(
+            assignedVideoCounts,
+            { pre: 4, post: 4 },
+            "each assigned assessment set has four videos",
         );
-        await submitAssessmentAnswer(client, "real", 60);
+
+        const submitDisabledBeforeMetadata = await client.evaluate(`
+            (() => {
+                renderAssessmentStage("pre");
+                return document.querySelector("#assessment-submit").disabled;
+            })()
+        `);
+        assert.equal(
+            submitDisabledBeforeMetadata,
+            true,
+            "submission remains disabled until video metadata loads",
+        );
+
+        for (const [classification, confidence] of [
+            ["real", 40],
+            ["real", 50],
+            ["fake", 60],
+            ["fake", 70],
+        ]) {
+            await submitAssessmentAnswer(client, classification, confidence);
+        }
         await completeLearning(client);
-        await submitAssessmentAnswer(client, "fake", 80);
-        await waitFor(
-            client,
-            "participantSession.assessmentProgress.post.videoIndex === 1",
-            "second post-assessment video",
-        );
-        await submitAssessmentAnswer(client, "real", 100);
+        for (const [classification, confidence] of [
+            ["fake", 70],
+            ["real", 80],
+            ["fake", 90],
+            ["fake", 100],
+        ]) {
+            await submitAssessmentAnswer(client, classification, confidence);
+        }
         await waitFor(
             client,
             "document.body.dataset.activeStage === 'results'",
@@ -379,14 +442,14 @@ async function run() {
         `);
         assert.deepEqual(results, {
             heading: "Study complete",
-            preCorrect: "1/2",
+            preCorrect: "2/4",
             preAccuracy: "50%",
-            preConfidence: "50%",
-            postCorrect: "2/2",
-            postAccuracy: "100%",
-            postConfidence: "90%",
-            difference: "+50 percentage points",
-            confidenceComparison: "50% → 90%",
+            preConfidence: "55%",
+            postCorrect: "3/4",
+            postAccuracy: "75%",
+            postConfidence: "85%",
+            difference: "+25 percentage points",
+            confidenceComparison: "55% → 85%",
             submitDisabled: false,
             newParticipantDisabled: true,
             submissionStatusAriaLive: "polite",
@@ -399,38 +462,46 @@ async function run() {
         assert.equal(payload.condition, 1);
         assert.deepEqual(payload.videoSets, { pre: "A", post: "B" });
         assert.deepEqual(payload.assessments.pre.responses[0], {
-            videoId: "ex1",
-            correctLabel: "real",
+            videoId: "t-01",
+            correctLabel: "fake",
             classification: "real",
             confidence: 40,
             selectedClues: ["facial_movements"],
         });
         assert.deepEqual(payload.assessments.post.responses[0], {
-            videoId: "ex3",
+            videoId: "t-03",
             correctLabel: "fake",
             classification: "fake",
-            confidence: 80,
+            confidence: 70,
             selectedClues: ["facial_movements"],
         });
+        assert.deepEqual(
+            payload.assessments.pre.responses.map(({ videoId }) => videoId),
+            ["t-01", "t-02", "b-01", "b-02"],
+        );
+        assert.deepEqual(
+            payload.assessments.post.responses.map(({ videoId }) => videoId),
+            ["t-03", "t-04", "b-03", "b-04"],
+        );
         assert.deepEqual(payload.learning, {
-            completedModuleIds: ["placeholder-module-1", "placeholder-module-2"],
-            quizAnswers: { "placeholder-module-2": "a" },
+            completedModuleIds: ["deepfake-clues", "check-understanding"],
+            quizAnswers: { q1: "a", q2: "b", q3: "a", q4: "c" },
             isComplete: true,
         });
         assert.deepEqual(payload.performance, {
             pre: {
-                correctClassifications: 1,
-                totalClassifications: 2,
+                correctClassifications: 2,
+                totalClassifications: 4,
                 accuracyPercent: 50,
-                averageConfidencePercent: 50,
+                averageConfidencePercent: 55,
             },
             post: {
-                correctClassifications: 2,
-                totalClassifications: 2,
-                accuracyPercent: 100,
-                averageConfidencePercent: 90,
+                correctClassifications: 3,
+                totalClassifications: 4,
+                accuracyPercent: 75,
+                averageConfidencePercent: 85,
             },
-            accuracyDifferencePercentagePoints: 50,
+            accuracyDifferencePercentagePoints: 25,
         });
         assert.doesNotThrow(() => JSON.parse(JSON.stringify(payload)));
 
@@ -478,7 +549,7 @@ async function run() {
                 const existingAnswers = participantSession.assessmentAnswers;
                 participantSession.assessmentAnswers = [{
                     stage: "pre",
-                    videoId: "ex1",
+                    videoId: "t-02",
                     answer: "real"
                 }];
                 try {
@@ -489,7 +560,7 @@ async function run() {
             })()
         `);
         assert.deepEqual(incompleteResponse, {
-            videoId: "ex1",
+            videoId: "t-02",
             correctLabel: "real",
             classification: "real",
             confidence: null,
@@ -639,7 +710,7 @@ async function run() {
         assert.equal(failedSubmission.callbacksRemoved, true);
         assert.equal(failedSubmission.scriptsRemoved, true);
         assert.equal(failedSubmission.participantId, oldParticipantId);
-        assert.equal(failedSubmission.assessmentAnswerCount, 4);
+        assert.equal(failedSubmission.assessmentAnswerCount, 8);
         assert.equal(failedSubmission.submitDisabled, false);
         assert.equal(failedSubmission.newParticipantDisabled, true);
 

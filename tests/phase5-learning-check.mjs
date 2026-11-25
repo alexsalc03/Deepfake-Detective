@@ -168,7 +168,12 @@ async function completePreAssessment(client) {
         "assessment content",
     );
 
-    for (let index = 0; index < 2; index += 1) {
+    const videoCount = await client.evaluate(
+        'getAssessmentVideos("pre").length',
+    );
+    assert.equal(videoCount, 4, "the assigned pre-assessment set has four videos");
+
+    for (let index = 0; index < videoCount; index += 1) {
         await waitFor(
             client,
             "!document.querySelector('#assessment-submit').disabled",
@@ -197,11 +202,11 @@ async function completePreAssessment(client) {
             })()
         `);
 
-        if (index === 0) {
+        if (index < videoCount - 1) {
             await waitFor(
                 client,
-                "participantSession.assessmentProgress.pre.videoIndex === 1",
-                "second pre-assessment video",
+                `participantSession.assessmentProgress.pre.videoIndex === ${index + 1}`,
+                `pre-assessment video ${index + 2}`,
             );
         }
     }
@@ -314,36 +319,65 @@ async function run() {
         await completeDemographics(client);
         await completePreAssessment(client);
 
-        assert.equal(
-            await client.evaluate(
-                "document.querySelector('#learning-module-progress').textContent.trim()",
-            ),
-            "Module 1 of 2",
-        );
-        assert.equal(
-            await client.evaluate(
-                "document.querySelector('#learning-module-title').textContent.trim()",
-            ),
-            "Placeholder Module 1",
-        );
-        assert.equal(
-            await client.evaluate(
-                "document.querySelector('#learning-continue').disabled",
-            ),
-            false,
-        );
-        assert.equal(
-            await client.evaluate(
-                "document.querySelector('#learning-quiz').hidden",
-            ),
-            true,
-        );
-        assert.equal(
-            await client.evaluate(
-                "document.querySelector('#learning-media').hidden",
-            ),
-            true,
-            "media is hidden when it is not configured",
+        const contentModule = await client.evaluate(`
+            (() => ({
+                progress: document.querySelector("#learning-module-progress").textContent.trim(),
+                title: document.querySelector("#learning-module-title").textContent.trim(),
+                introduction: document.querySelector("#learning-module-content").textContent.trim(),
+                heading: document.querySelector("#learning-content-heading")?.textContent.trim() ?? "",
+                clueCount: document.querySelectorAll(".learning-clue").length,
+                clueNumbers: [...document.querySelectorAll(".learning-clue-number")].map(
+                    (element) => element.textContent.trim()
+                ),
+                clueTitles: [...document.querySelectorAll(".learning-clue-title")].map(
+                    (element) => element.textContent.trim()
+                ),
+                note: document.querySelector("#learning-comparison-note")?.textContent.trim() ?? "",
+                playerCount: document.querySelectorAll("#learning-media video").length,
+                source: document.querySelector("#learning-media-video").getAttribute("src"),
+                controls: document.querySelector("#learning-media-video").controls,
+                autoplay: document.querySelector("#learning-media-video").autoplay,
+                preload: document.querySelector("#learning-media-video").preload,
+                buttonLabels: [...document.querySelectorAll("[data-learning-video]")].map(
+                    (button) => button.textContent.trim()
+                ),
+                selectedVideo: document.querySelector("[data-learning-video].is-selected")?.dataset.learningVideo ?? null,
+                quizHidden: document.querySelector("#learning-quiz").hidden,
+                continueDisabled: document.querySelector("#learning-continue").disabled
+            }))()
+        `);
+        assert.deepEqual(contentModule, {
+            progress: "Module 1 of 2",
+            title: "How people detect deepfakes, and where do they go wrong?",
+            introduction:
+                "Next you will watch more clips of politicians, some authentic and some AI-generated. Here is what research shows about which cues help and which mislead.",
+            heading: "Part 1: Five things to know",
+            clueCount: 5,
+            clueNumbers: ["01", "02", "03", "04", "05"],
+            clueTitles: [
+                "Confidence is not a reliable signal",
+                "Focus on the mouth",
+                "Voice can be supporting evidence",
+                "Disregard image quality",
+                "Verify the source",
+            ],
+            note:
+                "These videos are similar but not identical. A difference between them is not, by itself, evidence of manipulation.",
+            playerCount: 1,
+            source: "media/learning-trump_real.mp4",
+            controls: true,
+            autoplay: false,
+            preload: "metadata",
+            buttonLabels: ["Authentic Video", "Deepfake Video"],
+            selectedVideo: "real",
+            quizHidden: true,
+            continueDisabled: false,
+        });
+        await waitFor(
+            client,
+            "document.querySelector('#learning-media-video').readyState >= 1",
+            "authentic learning video metadata",
+            15000,
         );
         assert.equal(
             await client.evaluate(
@@ -373,8 +407,67 @@ async function run() {
         );
         await captureViewport(client, "/tmp/phase5-learning-mobile.png");
 
+        await client.evaluate(`
+            (async () => {
+                const video = document.querySelector("#learning-media-video");
+                await video.play();
+                document.querySelector('[data-learning-video="fake"]').click();
+                return true;
+            })()
+        `);
+        await waitFor(
+            client,
+            `document.querySelector("#learning-media-video").readyState >= 1 &&
+             document.querySelector("#learning-media-video").getAttribute("src") === "media/learning-trump_fake.mp4"`,
+            "deepfake learning video metadata",
+            15000,
+        );
+        assert.deepEqual(
+            await client.evaluate(`
+                (() => {
+                    const video = document.querySelector("#learning-media-video");
+                    return {
+                        paused: video.paused,
+                        currentTime: video.currentTime,
+                        selected: document.querySelector("[data-learning-video].is-selected").dataset.learningVideo,
+                        pressed: document.querySelector('[data-learning-video="fake"]').getAttribute("aria-pressed")
+                    };
+                })()
+            `),
+            { paused: true, currentTime: 0, selected: "fake", pressed: "true" },
+            "switching pauses, resets, and selects the configured video",
+        );
         await client.evaluate(
-            "document.querySelector('#learning-continue').click(); true",
+            `document.querySelector('[data-learning-video="real"]').click(); true`,
+        );
+        await waitFor(
+            client,
+            `document.querySelector("#learning-media-video").readyState >= 1 &&
+             document.querySelector("#learning-media-video").getAttribute("src") === "media/learning-trump_real.mp4"`,
+            "return to authentic learning video",
+            15000,
+        );
+        await client.evaluate(`
+            (() => {
+                const video = document.querySelector("#learning-media-video");
+                video.dispatchEvent(new Event("error"));
+                return true;
+            })()
+        `);
+        assert.equal(
+            await client.evaluate(
+                "!document.querySelector('#learning-media-status').hidden",
+            ),
+            true,
+            "learning video errors are communicated",
+        );
+
+        await client.evaluate(
+            `(() => {
+                const video = document.querySelector("#learning-media-video");
+                document.querySelector("#learning-continue").click();
+                return video.paused;
+            })()`,
         );
         await waitFor(
             client,
@@ -385,7 +478,7 @@ async function run() {
             await client.evaluate(
                 "document.querySelector('#learning-module-title').textContent",
             ),
-            "Placeholder Module 2",
+            "Check your understanding",
         );
         assert.equal(
             await client.evaluate(
@@ -413,62 +506,106 @@ async function run() {
         );
         await captureViewport(client, "/tmp/phase5-learning-quiz-mobile.png");
 
-        assert.equal(
-            await client.evaluate(
-                "document.querySelector('#learning-continue').disabled",
-            ),
-            true,
-            "quiz module cannot be skipped",
+        assert.deepEqual(
+            await client.evaluate(`
+                (() => ({
+                    progress: document.querySelector("#learning-question-progress").textContent.trim(),
+                    question: document.querySelector(".learning-question legend").textContent.trim(),
+                    options: document.querySelectorAll('#learning-quiz input[name="learning-quiz-answer"]').length,
+                    feedbackHidden: document.querySelector("#learning-feedback").hidden,
+                    checkDisabled: document.querySelector("#learning-check-answer").disabled,
+                    continueDisabled: document.querySelector("#learning-continue").disabled
+                }))()
+            `),
+            {
+                progress: "Question 1 of 4",
+                question: "Which of these best describes the mistakes people made in the study?",
+                options: 3,
+                feedbackHidden: true,
+                checkDisabled: true,
+                continueDisabled: true,
+            },
+            "the first quiz question starts unanswered and cannot be skipped",
         );
 
-        await client.evaluate(
-            "document.querySelector('#learning-check-answer').click(); true",
-        );
-        assert.equal(
-            await client.evaluate(
-                "!document.querySelector('#learning-quiz-error').hidden",
-            ),
-            true,
-            "submitting with no answer shows validation",
-        );
+        const quizSelections = ["a", "b", "a", "c"];
+        const expectedFeedback = [
+            "People felt just as confident when they were wrong, so feeling sure doesn't tell you much.",
+            "Blur doesn't tell you anything either way. The mouth and the way things are said are much better clues.",
+            "AI can copy a voice almost perfectly, so a voice that sounds right doesn't prove much on its own.",
+            "Judging by quality was right only about half the time, no better than guessing.",
+        ];
 
-        await client.evaluate(`
-            (() => {
-                const answers = [...document.querySelectorAll(
-                    '#learning-quiz input[name="learning-quiz-answer"]'
-                )];
-                answers.at(-1).click();
-                document.querySelector("#learning-check-answer").click();
-                return true;
-            })()
-        `);
-        await waitFor(
-            client,
-            "!document.querySelector('#learning-feedback').hidden",
-            "quiz feedback",
-        );
-        assert.equal(
+        for (let questionIndex = 0; questionIndex < 4; questionIndex += 1) {
+            assert.equal(
+                await client.evaluate(
+                    "document.querySelectorAll('#learning-quiz input[name=\"learning-quiz-answer\"]').length",
+                ),
+                3,
+                `question ${questionIndex + 1} has three options`,
+            );
+            await client.evaluate(`
+                (() => {
+                    document.querySelector(
+                        '#learning-quiz input[name="learning-quiz-answer"][value="${quizSelections[questionIndex]}"]'
+                    ).click();
+                    return document.querySelector("#learning-check-answer").disabled;
+                })()
+            `);
+            assert.equal(
+                await client.evaluate(
+                    "document.querySelector('#learning-check-answer').disabled",
+                ),
+                false,
+                "selecting an option enables Check Answer",
+            );
+            assert.equal(
+                await client.evaluate(
+                    "document.querySelector('#learning-feedback').hidden",
+                ),
+                true,
+                "feedback remains hidden before submission",
+            );
             await client.evaluate(
-                "document.querySelector('#learning-feedback').classList.contains('is-incorrect')",
-            ),
-            true,
-        );
-        assert.match(
+                "document.querySelector('#learning-check-answer').click(); true",
+            );
+            await waitFor(
+                client,
+                "!document.querySelector('#learning-feedback').hidden",
+                `question ${questionIndex + 1} feedback`,
+            );
+            assert.deepEqual(
+                await client.evaluate(`
+                    (() => ({
+                        result: document.querySelector("#learning-feedback-result").textContent.trim(),
+                        feedback: document.querySelector("#learning-explanation").textContent.trim(),
+                        locked: [...document.querySelectorAll('#learning-quiz input[name="learning-quiz-answer"]')].every(
+                            (input) => input.disabled
+                        ),
+                        saved: participantSession.learning.selectedQuizAnswers.q${questionIndex + 1},
+                        continueDisabled: document.querySelector("#learning-continue").disabled
+                    }))()
+                `),
+                {
+                    result: questionIndex === 0 ? "Incorrect" : "Correct",
+                    feedback: expectedFeedback[questionIndex],
+                    locked: true,
+                    saved: quizSelections[questionIndex],
+                    continueDisabled: false,
+                },
+                `question ${questionIndex + 1} is saved, locked, and explained`,
+            );
             await client.evaluate(
-                "document.querySelector('#learning-correct-answer').textContent",
-            ),
-            /Placeholder answer A/,
-        );
-        assert.equal(
-            await client.evaluate(
-                "document.querySelector('#learning-continue').disabled",
-            ),
-            false,
-        );
-
-        await client.evaluate(
-            "document.querySelector('#learning-continue').click(); true",
-        );
+                "document.querySelector('#learning-continue').click(); true",
+            );
+            if (questionIndex < 3) {
+                await waitFor(
+                    client,
+                    `document.querySelector("#learning-question-progress").textContent.includes("Question ${questionIndex + 2} of 4")`,
+                    `question ${questionIndex + 2}`,
+                );
+            }
+        }
         await waitFor(
             client,
             "document.body.dataset.activeStage === 'post-assessment'",
@@ -482,166 +619,16 @@ async function run() {
         );
         assert.equal(
             await client.evaluate(
-                "Object.keys(participantSession.learning.selectedQuizAnswers).length === 1",
+                "Object.keys(participantSession.learning.selectedQuizAnswers).length === 4",
             ),
             true,
         );
         assert.equal(
             await client.evaluate(
-                "participantSession.learning.selectedQuizAnswers['placeholder-module-2'] === 'c'",
+                `JSON.stringify(participantSession.learning.selectedQuizAnswers) === JSON.stringify({ q1: "a", q2: "b", q3: "a", q4: "c" })`,
             ),
             true,
             "the selected quiz answer is recorded",
-        );
-
-        await client.evaluate(`
-            document.querySelector(
-                "#assessment-screen [data-previous-stage]"
-            ).click();
-            true
-        `);
-        await waitFor(
-            client,
-            "document.body.dataset.activeStage === 'learning'",
-            "return to the final Learning module",
-        );
-        assert.equal(
-            await client.evaluate(
-                "!document.querySelector('#learning-feedback').hidden && document.querySelector('#learning-feedback').classList.contains('is-incorrect')",
-            ),
-            true,
-            "the submitted quiz state is restored",
-        );
-
-        await client.evaluate(`
-            (() => {
-                participantSession.learning = {
-                    completedModuleIds: ["placeholder-module-1"],
-                    selectedQuizAnswers: {},
-                    isComplete: false
-                };
-                renderLearningStage();
-                document.querySelector(
-                    '#learning-quiz input[name="learning-quiz-answer"][value="a"]'
-                ).click();
-                document.querySelector("#learning-check-answer").click();
-                return true;
-            })()
-        `);
-        await waitFor(
-            client,
-            "!document.querySelector('#learning-feedback').hidden",
-            "correct quiz feedback",
-        );
-        assert.equal(
-            await client.evaluate(
-                "document.querySelector('#learning-feedback').classList.contains('is-incorrect')",
-            ),
-            false,
-            "correct answers use the non-error feedback state",
-        );
-        assert.equal(
-            await client.evaluate(
-                "document.querySelector('#learning-feedback-result').textContent",
-            ),
-            "Correct",
-        );
-        await client.evaluate(
-            "document.querySelector('#learning-continue').click(); true",
-        );
-        await waitFor(
-            client,
-            "document.body.dataset.activeStage === 'post-assessment'",
-            "post-assessment after a correct answer",
-        );
-
-        await client.evaluate(`
-            (() => {
-                participantSession.learning = {
-                    completedModuleIds: [],
-                    selectedQuizAnswers: {},
-                    isComplete: false
-                };
-                initialiseLearningContent([
-                    {
-                        id: "image-check",
-                        title: "Image check",
-                        content: ["Placeholder image content."],
-                        media: {
-                            type: "image",
-                            src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='9'%3E%3C/svg%3E",
-                            alt: "Placeholder image"
-                        }
-                    }
-                ]);
-                showStage(2, false);
-                return true;
-            })()
-        `);
-        await waitFor(
-            client,
-            "document.querySelector('#learning-media-image').naturalWidth === 16",
-            "configured image media",
-        );
-        assert.equal(
-            await client.evaluate(
-                "!document.querySelector('#learning-media').hidden && !document.querySelector('#learning-media-image').hidden",
-            ),
-            true,
-        );
-        assert.equal(
-            await client.evaluate(`
-                (() => {
-                    const image = document.querySelector("#learning-media-image");
-                    const bounds = image.getBoundingClientRect();
-                    return Math.abs(bounds.width / bounds.height - 16 / 9) < 0.01;
-                })()
-            `),
-            true,
-            "image preserves its configured aspect ratio",
-        );
-
-        await client.evaluate(`
-            (() => {
-                initialiseLearningContent([
-                    {
-                        id: "video-check",
-                        title: "Video check",
-                        content: ["Placeholder video content."],
-                        media: {
-                            type: "video",
-                            src: "media/ex.webm",
-                            alt: "Placeholder video"
-                        }
-                    }
-                ]);
-                return true;
-            })()
-        `);
-        await waitFor(
-            client,
-            "document.querySelector('#learning-media-video').readyState >= 1",
-            "configured video metadata",
-        );
-        assert.equal(
-            await client.evaluate(
-                "!document.querySelector('#learning-media').hidden && !document.querySelector('#learning-media-video').hidden",
-            ),
-            true,
-        );
-        assert.equal(
-            await client.evaluate(`
-                (() => {
-                    const video = document.querySelector("#learning-media-video");
-                    const bounds = video.getBoundingClientRect();
-                    return Math.abs(
-                        bounds.width / bounds.height -
-                        video.videoWidth / video.videoHeight
-                    ) < 0.01;
-                })()
-            `),
-            true,
-            "video preserves its source aspect ratio",
         );
 
         await client.evaluate(`
@@ -681,8 +668,13 @@ async function run() {
                 initialiseLearningContent([
                     {
                         id: "invalid-module",
+                        type: "content",
                         title: "",
-                        content: []
+                        introduction: "",
+                        comparisonVideos: {},
+                        comparisonNote: "",
+                        contentHeading: "",
+                        clues: []
                     }
                 ]);
                 showStage(2, false);

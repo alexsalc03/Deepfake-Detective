@@ -1,36 +1,135 @@
 [
-    {
-        "id": "placeholder-module-1",
-        "title": "Placeholder Module 1",
-        "content": [
-            "This is placeholder text for testing the learning module layout.",
-            "The approved educational content will replace this example."
-        ]
+  {
+    "id": "deepfake-clues",
+    "type": "content",
+    "title": "How people detect deepfakes, and where do they go wrong?",
+    "introduction": "Next you will watch more clips of politicians, some authentic and some AI-generated. Here is what research shows about which cues help and which mislead.",
+    "comparisonVideos": {
+      "real": {
+        "label": "Authentic Video",
+        "file": "media/learning-trump_real.mp4"
+      },
+      "fake": {
+        "label": "Deepfake Video",
+        "file": "media/learning-trump_fake.mp4"
+      }
     },
-    {
-        "id": "placeholder-module-2",
-        "title": "Placeholder Module 2",
-        "content": [
-            "This placeholder paragraph demonstrates a module with an optional question."
+    "comparisonNote": "These videos are similar but not identical. A difference between them is not, by itself, evidence of manipulation.",
+    "contentHeading": "Part 1: Five things to know",
+    "clues": [
+      {
+        "id": "confidence",
+        "title": "Confidence is not a reliable signal",
+        "text": "Across dozens of studies, people detect deepfakes only slightly better than chance. In a recent study, participants judged 79% of real videos correctly but only 72% of fakes, and felt similarly confident in both cases. The most typical error is accepting a fake without any doubt."
+      },
+      {
+        "id": "mouth",
+        "title": "Focus on the mouth",
+        "text": "Many political deepfakes take genuine footage and edit the mouth to sync with the new text. Check whether the lips stay synced with every word, and whether the teeth look blurred. When participants based their judgement on the face, they caught the majority of fake videos."
+      },
+      {
+        "id": "voice",
+        "title": "Voice can be supporting evidence",
+        "text": "Cloned voices can sound real, and they fooled people more often than voice actors did. Pay attention to how things are said. A cloned voice can sound flat, pause in odd places, or carry emotion that doesn't fit the words."
+      },
+      {
+        "id": "quality",
+        "title": "Disregard image quality",
+        "text": "Real videos lose quality each time they are shared on social media, whilst fakes can be perfectly sharp. Judging by quality was right only about half the time, and people who relied on it tended to be overconfident."
+      },
+      {
+        "id": "source",
+        "title": "Verify the source",
+        "text": "Before accepting or sharing a surprising clip, check who published it first and whether reliable media outlets or independent fact-checkers report it."
+      }
+    ]
+  },
+  {
+    "id": "check-understanding",
+    "type": "quiz",
+    "title": "Check your understanding",
+    "contentHeading": "Part 2: Check your understanding",
+    "questions": [
+      {
+        "id": "q1",
+        "question": "Which of these best describes the mistakes people made in the study?",
+        "options": [
+          {
+            "id": "a",
+            "text": "They were often unsure, so they guessed and got it wrong"
+          },
+          {
+            "id": "b",
+            "text": "They were too suspicious and kept calling real videos fake"
+          },
+          {
+            "id": "c",
+            "text": "They believed fakes were real and felt just as sure as usual"
+          }
         ],
-        "quiz": {
-            "question": "Which answer is marked correct in this placeholder question?",
-            "options": [
-                {
-                    "value": "a",
-                    "label": "Placeholder answer A"
-                },
-                {
-                    "value": "b",
-                    "label": "Placeholder answer B"
-                },
-                {
-                    "value": "c",
-                    "label": "Placeholder answer C"
-                }
-            ],
-            "correctAnswer": "a",
-            "explanation": "This placeholder explanation appears after the answer is checked."
-        }
-    }
+        "correctOptionId": "c",
+        "feedback": "People felt just as confident when they were wrong, so feeling sure doesn't tell you much."
+      },
+      {
+        "id": "q2",
+        "question": "The lips match every word and the emotion fits, but the video is blurry. What's your best call?",
+        "options": [
+          {
+            "id": "a",
+            "text": "Probably fake, because blur is a typical sign of AI editing"
+          },
+          {
+            "id": "b",
+            "text": "Probably real, but still worth checking where it came from"
+          },
+          {
+            "id": "c",
+            "text": "No way to tell, since the blur hides all the useful clues"
+          }
+        ],
+        "correctOptionId": "b",
+        "feedback": "Blur doesn't tell you anything either way. The mouth and the way things are said are much better clues."
+      },
+      {
+        "id": "q3",
+        "question": "Which of these tells you the least about whether a clip is real?",
+        "options": [
+          {
+            "id": "a",
+            "text": "The voice sounds exactly like the politician"
+          },
+          {
+            "id": "b",
+            "text": "The lips match every single word being said"
+          },
+          {
+            "id": "c",
+            "text": "The emotion in the voice fits the words"
+          }
+        ],
+        "correctOptionId": "a",
+        "feedback": "AI can copy a voice almost perfectly, so a voice that sounds right doesn't prove much on its own."
+      },
+      {
+        "id": "q4",
+        "question": "A clip is heavily compressed and the face looks a bit pixelated. What should you conclude?",
+        "options": [
+          {
+            "id": "a",
+            "text": "Probably fake, since AI often leaves pixelated marks like this"
+          },
+          {
+            "id": "b",
+            "text": "Probably real, since deepfakes are usually sharp and clean"
+          },
+          {
+            "id": "c",
+            "text": "Neither, since real and fake clips both get compressed"
+          }
+        ],
+        "correctOptionId": "c",
+        "feedback": "Judging by quality was right only about half the time, no better than guessing."
+      }
+    ]
+  }
 ]

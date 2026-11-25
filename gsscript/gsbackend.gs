@@ -425,11 +425,14 @@ function testSubmission() {
 
     learning: {
       completedModuleIds: [
-        "placeholder-module-1",
-        "placeholder-module-2"
+        "deepfake-clues",
+        "check-understanding"
       ],
       quizAnswers: {
-        "placeholder-module-2": "a"
+        q1: "c",
+        q2: "b",
+        q3: "a",
+        q4: "c"
       },
       isComplete: true
     },

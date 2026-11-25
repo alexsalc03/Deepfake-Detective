@@ -200,18 +200,22 @@ async function run() {
                 participantSession.condition = 1;
                 participantSession.videoSets = { pre: "A", post: "B" };
                 participantSession.assessmentAnswers = [
-                    { stage: "pre", videoId: "ex1", videoPosition: 1, answer: "real", confidence: 50, clues: ["general_impression"] },
-                    { stage: "pre", videoId: "ex2", videoPosition: 2, answer: "fake", confidence: 50, clues: ["general_impression"] },
-                    { stage: "post", videoId: "ex3", videoPosition: 1, answer: "fake", confidence: 50, clues: ["general_impression"] },
-                    { stage: "post", videoId: "ex4", videoPosition: 2, answer: "real", confidence: 50, clues: ["general_impression"] }
+                    { stage: "pre", videoId: "t-01", videoPosition: 1, answer: "fake", confidence: 50, clues: ["general_impression"] },
+                    { stage: "pre", videoId: "t-02", videoPosition: 2, answer: "real", confidence: 50, clues: ["general_impression"] },
+                    { stage: "pre", videoId: "b-01", videoPosition: 3, answer: "fake", confidence: 50, clues: ["general_impression"] },
+                    { stage: "pre", videoId: "b-02", videoPosition: 4, answer: "real", confidence: 50, clues: ["general_impression"] },
+                    { stage: "post", videoId: "t-03", videoPosition: 1, answer: "fake", confidence: 50, clues: ["general_impression"] },
+                    { stage: "post", videoId: "t-04", videoPosition: 2, answer: "real", confidence: 50, clues: ["general_impression"] },
+                    { stage: "post", videoId: "b-03", videoPosition: 3, answer: "fake", confidence: 50, clues: ["general_impression"] },
+                    { stage: "post", videoId: "b-04", videoPosition: 4, answer: "real", confidence: 50, clues: ["general_impression"] }
                 ];
                 participantSession.assessmentProgress = {
-                    pre: { videoIndex: 2 },
-                    post: { videoIndex: 2 }
+                    pre: { videoIndex: 4 },
+                    post: { videoIndex: 4 }
                 };
                 participantSession.learning = {
-                    completedModuleIds: ["placeholder-module-1", "placeholder-module-2"],
-                    selectedQuizAnswers: { "placeholder-module-2": "a" },
+                    completedModuleIds: ["deepfake-clues", "check-understanding"],
+                    selectedQuizAnswers: { q1: "c", q2: "b", q3: "a", q4: "c" },
                     isComplete: true
                 };
                 showStage(4, false);
