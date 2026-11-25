@@ -375,6 +375,88 @@ async function run() {
             conditionTwo: { condition: 2, videoSets: { pre: "B", post: "A" } },
         });
 
+        const selectionBehavior = await client.evaluate(`
+            (() => {
+                const originalRandom = Math.random;
+                const runSelection = (randomValue) => {
+                    participantSession.condition = null;
+                    participantSession.videoSets = { pre: null, post: null };
+                    Math.random = () => randomValue;
+                    assignParticipantCondition();
+                    const pre = getAssessmentVideos("pre").map(({ id, label }) => ({ id, label }));
+                    const post = getAssessmentVideos("post").map(({ id, label }) => ({ id, label }));
+                    return {
+                        condition: participantSession.condition,
+                        videoSets: { ...participantSession.videoSets },
+                        pre,
+                        post
+                    };
+                };
+                const first = runSelection(0.1);
+                const stable = getAssessmentVideos("pre").map(({ id }) => id);
+                renderAssessmentStage("pre");
+                const stableAfterRender = getAssessmentVideos("pre").map(({ id }) => id);
+                const second = runSelection(0.9);
+                Math.random = originalRandom;
+                participantSession.condition = null;
+                participantSession.videoSets = { pre: null, post: null };
+                return {
+                    first,
+                    second,
+                    stable,
+                    stableAfterRender,
+                    allSelectedVideoIds: [...new Set([
+                        ...first.pre.map(({ id }) => id),
+                        ...first.post.map(({ id }) => id),
+                        ...second.pre.map(({ id }) => id),
+                        ...second.post.map(({ id }) => id)
+                    ])].sort()
+                };
+            })()
+        `);
+        for (const selection of [
+            selectionBehavior.first,
+            selectionBehavior.second,
+        ]) {
+            assert.equal(selection.pre.length, 2, "Round-1 selects two videos");
+            assert.equal(selection.post.length, 2, "Round-2 selects two videos");
+            assert.deepEqual(
+                selection.pre.map(({ label }) => label).sort(),
+                ["fake", "real"],
+                "Round-1 selects one authentic and one deepfake video",
+            );
+            assert.deepEqual(
+                selection.post.map(({ label }) => label).sort(),
+                ["fake", "real"],
+                "Round-2 selects one authentic and one deepfake video",
+            );
+        }
+        assert.notDeepEqual(
+            selectionBehavior.first,
+            selectionBehavior.second,
+            "different simulated participants can receive different selections",
+        );
+        assert.deepEqual(
+            selectionBehavior.stable,
+            selectionBehavior.stableAfterRender,
+            "a participant's selection remains stable across renders",
+        );
+        assert.equal(
+            new Set([
+                ...selectionBehavior.first.pre.map(({ id }) => id),
+                ...selectionBehavior.first.post.map(({ id }) => id),
+                ...selectionBehavior.second.pre.map(({ id }) => id),
+                ...selectionBehavior.second.post.map(({ id }) => id),
+            ]).size,
+            8,
+            "all eight configured videos are eligible for selection",
+        );
+        assert.deepEqual(
+            selectionBehavior.allSelectedVideoIds,
+            ["b-01", "b-02", "b-03", "b-04", "t-01", "t-02", "t-03", "t-04"],
+            "selection covers every configured assessment video",
+        );
+
         await completeDemographics(client);
         const assignedVideoCounts = await client.evaluate(`
             ({
@@ -384,8 +466,8 @@ async function run() {
         `);
         assert.deepEqual(
             assignedVideoCounts,
-            { pre: 4, post: 4 },
-            "each assigned assessment set has four videos",
+            { pre: 2, post: 2 },
+            "each assigned assessment round has two selected videos",
         );
 
         const submitDisabledBeforeMetadata = await client.evaluate(`
@@ -400,21 +482,27 @@ async function run() {
             "submission remains disabled until video metadata loads",
         );
 
-        for (const [classification, confidence] of [
-            ["real", 40],
-            ["real", 50],
-            ["fake", 60],
-            ["fake", 70],
-        ]) {
+        const selectedAssessmentVideos = await client.evaluate(`
+            ({
+                pre: getAssessmentVideos("pre").map(({ id, label }) => ({ id, label })),
+                post: getAssessmentVideos("post").map(({ id, label }) => ({ id, label }))
+            })
+        `);
+        const oppositeLabel = (label) => (label === "real" ? "fake" : "real");
+        const preAnswers = [
+            [oppositeLabel(selectedAssessmentVideos.pre[0].label), 40],
+            [selectedAssessmentVideos.pre[1].label, 50],
+        ];
+        const postAnswers = [
+            [selectedAssessmentVideos.post[0].label, 80],
+            [selectedAssessmentVideos.post[1].label, 100],
+        ];
+
+        for (const [classification, confidence] of preAnswers) {
             await submitAssessmentAnswer(client, classification, confidence);
         }
         await completeLearning(client);
-        for (const [classification, confidence] of [
-            ["fake", 70],
-            ["real", 80],
-            ["fake", 90],
-            ["fake", 100],
-        ]) {
+        for (const [classification, confidence] of postAnswers) {
             await submitAssessmentAnswer(client, classification, confidence);
         }
         await waitFor(
@@ -497,6 +585,8 @@ async function run() {
                 difference: document.querySelector("#accuracy-difference").textContent.trim(),
                 confidenceComparison: document.querySelector("#confidence-comparison").textContent.trim(),
                 newParticipantDisabled: document.querySelector("#new-participant")?.disabled ?? null,
+                newParticipantInResults: document.querySelector("#results-screen #new-participant") !== null,
+                thankYou: document.querySelector("#results-screen .results-intro p").textContent.trim().replace(/\\s+/g, " "),
                 submissionStatusAriaLive: document.querySelector("#submission-status").getAttribute("aria-live"),
                 submissionControlsInResults: document.querySelector("#results-screen #submit-results") !== null,
                 backExposed: document.querySelector("#results-screen [data-previous-stage]") !== null
@@ -504,15 +594,17 @@ async function run() {
         `);
         assert.deepEqual(results, {
             heading: "Study complete",
-            preCorrect: "2/4",
+            preCorrect: "1/2",
             preAccuracy: "50%",
-            preConfidence: "55%",
-            postCorrect: "3/4",
-            postAccuracy: "75%",
-            postConfidence: "85%",
-            difference: "+25 percentage points",
-            confidenceComparison: "55% → 85%",
-            newParticipantDisabled: false,
+            preConfidence: "45%",
+            postCorrect: "2/2",
+            postAccuracy: "100%",
+            postConfidence: "90%",
+            difference: "+50 percentage points",
+            confidenceComparison: "45% → 90%",
+            newParticipantDisabled: null,
+            newParticipantInResults: false,
+            thankYou: "Thank you for participating. Your Round-1 and Round-2 performance are compared below.",
             submissionStatusAriaLive: "polite",
             submissionControlsInResults: false,
             backExposed: false,
@@ -524,26 +616,50 @@ async function run() {
         assert.equal(payload.condition, 1);
         assert.deepEqual(payload.videoSets, { pre: "A", post: "B" });
         assert.deepEqual(payload.assessments.pre.responses[0], {
-            videoId: "t-01",
-            correctLabel: "fake",
-            classification: "real",
+            videoId: selectedAssessmentVideos.pre[0].id,
+            correctLabel: selectedAssessmentVideos.pre[0].label,
+            classification: oppositeLabel(selectedAssessmentVideos.pre[0].label),
             confidence: 40,
             selectedClues: ["facial_movements"],
         });
         assert.deepEqual(payload.assessments.post.responses[0], {
-            videoId: "t-03",
-            correctLabel: "fake",
-            classification: "fake",
-            confidence: 70,
+            videoId: selectedAssessmentVideos.post[0].id,
+            correctLabel: selectedAssessmentVideos.post[0].label,
+            classification: selectedAssessmentVideos.post[0].label,
+            confidence: 80,
             selectedClues: ["facial_movements"],
         });
         assert.deepEqual(
             payload.assessments.pre.responses.map(({ videoId }) => videoId),
-            ["t-01", "t-02", "b-01", "b-02"],
+            selectedAssessmentVideos.pre.map(({ id }) => id),
         );
         assert.deepEqual(
             payload.assessments.post.responses.map(({ videoId }) => videoId),
-            ["t-03", "t-04", "b-03", "b-04"],
+            selectedAssessmentVideos.post.map(({ id }) => id),
+        );
+        assert.equal(
+            payload.assessments.pre.responses.length,
+            2,
+            "the pre-assessment payload contains two responses",
+        );
+        assert.equal(
+            payload.assessments.post.responses.length,
+            2,
+            "the post-assessment payload contains two responses",
+        );
+        assert.equal(
+            payload.assessments.pre.responses.length +
+                payload.assessments.post.responses.length,
+            4,
+            "the participant payload contains four video responses",
+        );
+        assert.equal(
+            new Set([
+                ...payload.assessments.pre.responses.map(({ videoId }) => videoId),
+                ...payload.assessments.post.responses.map(({ videoId }) => videoId),
+            ]).size,
+            4,
+            "no assessment video repeats within a participant session",
         );
         assert.deepEqual(payload.learning, {
             completedModuleIds: ["deepfake-clues", "check-understanding"],
@@ -552,18 +668,18 @@ async function run() {
         });
         assert.deepEqual(payload.performance, {
             pre: {
-                correctClassifications: 2,
-                totalClassifications: 4,
+                correctClassifications: 1,
+                totalClassifications: 2,
                 accuracyPercent: 50,
-                averageConfidencePercent: 55,
+                averageConfidencePercent: 45,
             },
             post: {
-                correctClassifications: 3,
-                totalClassifications: 4,
-                accuracyPercent: 75,
-                averageConfidencePercent: 85,
+                correctClassifications: 2,
+                totalClassifications: 2,
+                accuracyPercent: 100,
+                averageConfidencePercent: 90,
             },
-            accuracyDifferencePercentagePoints: 25,
+            accuracyDifferencePercentagePoints: 50,
         });
         assert.doesNotThrow(() => JSON.parse(JSON.stringify(payload)));
 
@@ -658,7 +774,6 @@ async function run() {
                 verificationParticipantId:
                     window.__phase6Submission.verificationRequests[0]?.participantId,
                 submitHidden: document.querySelector("#submit-results").hidden,
-                newParticipantDisabled: document.querySelector("#new-participant").disabled,
                 viewResultsHidden: document.querySelector("#view-results").hidden
             })
         `);
@@ -668,7 +783,6 @@ async function run() {
             verificationRequestCount: 1,
             verificationParticipantId: oldParticipantId,
             submitHidden: true,
-            newParticipantDisabled: false,
             viewResultsHidden: false,
         });
 
@@ -703,7 +817,7 @@ async function run() {
 
         const resetState = await client.evaluate(`
             (() => {
-                document.querySelector("#new-participant").click();
+                resetExperimentSession();
                 return {
                     stage: document.body.dataset.activeStage,
                     session: participantSession,
@@ -712,7 +826,6 @@ async function run() {
                     submissionStatus: document.querySelector("#submission-status").textContent.trim(),
                     submitText: document.querySelector("#submit-results").textContent.trim(),
                     submitHidden: document.querySelector("#submit-results").hidden,
-                    newParticipantDisabled: document.querySelector("#new-participant").disabled,
                     oldParticipantId: ${JSON.stringify(oldParticipantId)}
                 };
             })()
@@ -723,6 +836,10 @@ async function run() {
         assert.deepEqual(resetState.session.demographics, {});
         assert.equal(resetState.session.condition, null);
         assert.deepEqual(resetState.session.videoSets, { pre: null, post: null });
+        assert.deepEqual(resetState.session.selectedVideoIds, {
+            pre: [],
+            post: [],
+        });
         assert.deepEqual(resetState.session.assessmentAnswers, []);
         assert.deepEqual(resetState.session.assessmentProgress, {
             pre: { videoIndex: 0 },
@@ -738,7 +855,6 @@ async function run() {
         assert.equal(resetState.submissionStatus, "Your results have not been submitted.");
         assert.equal(resetState.submitText, "Submit Results");
         assert.equal(resetState.submitHidden, false);
-        assert.equal(resetState.newParticipantDisabled, true);
         assert.equal(resetState.session.participantId === oldParticipantId, false);
 
         await completeDemographics(client);

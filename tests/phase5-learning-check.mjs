@@ -168,16 +168,29 @@ async function completePreAssessment(client) {
         "assessment content",
     );
 
-    const videoCount = await client.evaluate(
-        'getAssessmentVideos("pre").length',
+    const selectedVideos = await client.evaluate(
+        'getAssessmentVideos("pre").map(({ id, label }) => ({ id, label }))',
     );
-    assert.equal(videoCount, 4, "the assigned pre-assessment set has four videos");
+    const videoCount = selectedVideos.length;
+    assert.equal(videoCount, 2, "the assigned pre-assessment round has two videos");
+    assert.deepEqual(
+        selectedVideos.map(({ label }) => label).sort(),
+        ["fake", "real"],
+        "the pre-assessment round has one authentic and one deepfake video",
+    );
 
     for (let index = 0; index < videoCount; index += 1) {
         await waitFor(
             client,
             "!document.querySelector('#assessment-submit').disabled",
             `assessment video ${index + 1}`,
+        );
+        assert.equal(
+            await client.evaluate(
+                'document.querySelector("[data-video-position]").textContent.trim()',
+            ),
+            `Video ${index + 1} of 2`,
+            `assessment progress shows video ${index + 1} of 2`,
         );
         await waitFor(
             client,

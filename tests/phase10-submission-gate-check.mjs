@@ -228,18 +228,18 @@ async function run() {
                 };
                 participantSession.condition = 1;
                 participantSession.videoSets = { pre: "A", post: "B" };
+                participantSession.selectedVideoIds = {
+                    pre: ["t-01", "t-02"],
+                    post: ["t-03", "t-04"]
+                };
                 participantSession.assessmentAnswers = [
                     { stage: "pre", videoId: "t-01", videoPosition: 1, answer: "fake", confidence: 40, clues: ["facial_movements"] },
-                    { stage: "pre", videoId: "t-02", videoPosition: 2, answer: "real", confidence: 50, clues: ["facial_movements"] },
-                    { stage: "pre", videoId: "b-01", videoPosition: 3, answer: "fake", confidence: 60, clues: ["facial_movements"] },
-                    { stage: "pre", videoId: "b-02", videoPosition: 4, answer: "fake", confidence: 70, clues: ["facial_movements"] },
-                    { stage: "post", videoId: "t-03", videoPosition: 1, answer: "fake", confidence: 70, clues: ["facial_movements"] },
-                    { stage: "post", videoId: "t-04", videoPosition: 2, answer: "fake", confidence: 80, clues: ["facial_movements"] },
-                    { stage: "post", videoId: "b-03", videoPosition: 3, answer: "fake", confidence: 90, clues: ["facial_movements"] }
+                    { stage: "pre", videoId: "t-02", videoPosition: 2, answer: "fake", confidence: 50, clues: ["facial_movements"] },
+                    { stage: "post", videoId: "t-03", videoPosition: 1, answer: "fake", confidence: 70, clues: ["facial_movements"] }
                 ];
                 participantSession.assessmentProgress = {
-                    pre: { videoIndex: 4 },
-                    post: { videoIndex: 3 }
+                    pre: { videoIndex: 2 },
+                    post: { videoIndex: 1 }
                 };
                 participantSession.learning = {
                     completedModuleIds: ["deepfake-clues", "check-understanding"],
@@ -257,7 +257,14 @@ async function run() {
         await waitFor(
             client,
             "assessmentContentReady && !document.querySelector('#assessment-submit').disabled",
-            "final post-assessment video",
+            "second post-assessment video",
+        );
+        assert.equal(
+            await client.evaluate(
+                'document.querySelector("[data-video-position]").textContent.trim()',
+            ),
+            "Video 2 of 2",
+            "Round-2 progress shows video 2 of 2",
         );
         await client.evaluate(`
             (() => {
@@ -277,7 +284,7 @@ async function run() {
         await waitFor(
             client,
             "document.body.dataset.activeStage === 'submission'",
-            "submission stage after the fourth post-assessment video",
+            "submission stage after the second post-assessment video",
         );
 
         const readyState = await client.evaluate(`
@@ -351,7 +358,7 @@ async function run() {
                 window.__phase10 = {
                     fetchCalls: [],
                     verificationRequests: [],
-                    verificationMode: "failure"
+                    verificationResults: ["wrong", "false", "error"]
                 };
                 window.fetch = async (url, options) => {
                     window.__phase10.fetchCalls.push({
@@ -373,30 +380,36 @@ async function run() {
                         callbackName,
                         removed: false
                     };
+                    request.callback = window[callbackName];
                     window.__phase10.verificationRequests.push(request);
                     element.remove = () => {
                         request.removed = true;
                     };
                     setTimeout(() => {
-                        if (window.__phase10.verificationMode === "success") {
-                            window[callbackName]?.({
+                        const callback = window[callbackName];
+                        if (!callback) {
+                            return;
+                        }
+                        const result = window.__phase10.verificationResults.shift() ?? "error";
+                        if (result === "success") {
+                            callback({
                                 participantId: participantSession.participantId,
                                 saved: true
                             });
-                        } else if (window.__phase10.verificationRequests.length === 1) {
-                            window[callbackName]?.({
+                        } else if (result === "wrong") {
+                            callback({
                                 participantId: "WRONG_PARTICIPANT",
                                 saved: true
                             });
-                        } else if (window.__phase10.verificationRequests.length === 2) {
-                            window[callbackName]?.({
+                        } else if (result === "false") {
+                            callback({
                                 participantId: participantSession.participantId,
                                 saved: false
                             });
                         } else {
                             element.onerror?.(new Event("error"));
                         }
-                    }, 0);
+                    }, 50);
                     return element;
                 };
                 document.querySelector("#submit-results").click();
@@ -420,8 +433,29 @@ async function run() {
 
         await waitFor(
             client,
-            `document.querySelector("#submission-status").textContent.trim() === "We couldn't confirm that your responses were saved. Please try again."`,
-            "failed submission state",
+            `document.querySelector("#submission-status").textContent.trim() === "Checking that your responses were saved..."`,
+            "automatic verification state",
+        );
+        assert.deepEqual(
+            await client.evaluate(`
+                ({
+                    buttonText: document.querySelector("#submit-results").textContent.trim(),
+                    buttonDisabled: document.querySelector("#submit-results").disabled,
+                    loadingHidden: document.querySelector("#submission-loading").hidden
+                })
+            `),
+            {
+                buttonText: "Verifying Submission...",
+                buttonDisabled: true,
+                loadingHidden: false,
+            },
+            "automatic verification is visibly in progress",
+        );
+
+        await waitFor(
+            client,
+            `document.querySelector("#submission-status").textContent.trim() === "We couldn't confirm that your responses were saved yet. Check again without resubmitting."`,
+            "unconfirmed submission state",
         );
         const failedState = await client.evaluate(`
             (() => ({
@@ -462,8 +496,8 @@ async function run() {
             3,
         );
         assert.equal(failedState.participantId, "PHASE10_TEST_PARTICIPANT");
-        assert.equal(failedState.assessmentAnswerCount, 8);
-        assert.equal(failedState.submitText, "Retry Submission");
+        assert.equal(failedState.assessmentAnswerCount, 4);
+        assert.equal(failedState.submitText, "Check Submission Again");
         assert.equal(failedState.submitDisabled, false);
         assert.equal(failedState.viewResultsHidden, true);
         assert.equal(failedState.resultsHidden, true);
@@ -473,12 +507,169 @@ async function run() {
             JSON.parse(failedState.fetchCalls[0].body).participantId,
             "PHASE10_TEST_PARTICIPANT",
         );
+        assert.equal(
+            JSON.parse(failedState.fetchCalls[0].body).assessments.pre.responses.length,
+            2,
+            "the original POST contains two Round-1 responses",
+        );
+        assert.equal(
+            JSON.parse(failedState.fetchCalls[0].body).assessments.post.responses.length,
+            2,
+            "the original POST contains two Round-2 responses",
+        );
 
-        await client.evaluate(`
+        const retrySubmitting = await client.evaluate(`
+            (() => {
+                window.__phase10.verificationResults = ["success"];
+                document.querySelector("#submit-results").click();
+                document.querySelector("#submit-results").click();
+                return {
+                    buttonText: document.querySelector("#submit-results").textContent.trim(),
+                    buttonDisabled: document.querySelector("#submit-results").disabled,
+                    status: document.querySelector("#submission-status").textContent.trim()
+                };
+            })()
+        `);
+        assert.deepEqual(retrySubmitting, {
+            buttonText: "Verifying Submission...",
+            buttonDisabled: true,
+            status: "Checking that your responses were saved...",
+        });
+        await waitFor(
+            client,
+            `document.querySelector("#submission-status").textContent.trim() === "Your responses have been saved successfully."`,
+            "verified manual retry",
+        );
+
+        const successState = await client.evaluate(`
+            ({
+                fetchCallCount: window.__phase10.fetchCalls.length,
+                verificationRequestCount:
+                    window.__phase10.verificationRequests.length,
+                participantId: participantSession.participantId,
+                submitHidden: document.querySelector("#submit-results").hidden,
+                viewResultsText: document.querySelector("#view-results").textContent.trim(),
+                viewResultsDisabled: document.querySelector("#view-results").disabled,
+                viewResultsHidden: document.querySelector("#view-results").hidden,
+                resultsHidden: document.querySelector("#results-screen").hidden,
+                requestBody: JSON.stringify(prepareSubmissionPayload())
+            })
+        `);
+        assert.deepEqual(successState, {
+            fetchCallCount: 1,
+            verificationRequestCount: 4,
+            participantId: "PHASE10_TEST_PARTICIPANT",
+            submitHidden: true,
+            viewResultsText: "View Results",
+            viewResultsDisabled: false,
+            viewResultsHidden: false,
+            resultsHidden: true,
+            requestBody: failedState.fetchCalls[0].body,
+        });
+
+        const staleAfterSuccess = await client.evaluate(`
+            (() => {
+                window.__phase10.verificationRequests[0].callback?.({
+                    participantId: participantSession.participantId,
+                    saved: false
+                });
+                return {
+                    state: submissionState,
+                    status: document.querySelector("#submission-status").textContent.trim(),
+                    viewResultsHidden: document.querySelector("#view-results").hidden
+                };
+            })()
+        `);
+        assert.deepEqual(staleAfterSuccess, {
+            state: "success",
+            status: "Your responses have been saved successfully.",
+            viewResultsHidden: false,
+        });
+
+        const delayedVerificationState = await client.evaluate(`
             (() => {
                 resetSubmissionState();
                 window.__phase10.fetchCalls = [];
                 window.__phase10.verificationRequests = [];
+                window.__phase10.verificationResults = ["false", "success"];
+                document.querySelector("#submit-results").click();
+                return true;
+            })()
+        `);
+        assert.equal(delayedVerificationState, true);
+        await waitFor(
+            client,
+            `document.querySelector("#submission-status").textContent.trim() === "Your responses have been saved successfully."`,
+            "delayed verification success",
+        );
+        assert.deepEqual(
+            await client.evaluate(`
+                ({
+                    fetchCallCount: window.__phase10.fetchCalls.length,
+                    verificationRequestCount:
+                        window.__phase10.verificationRequests.length,
+                    participantId: participantSession.participantId,
+                    body: window.__phase10.fetchCalls[0]?.body
+                })
+            `),
+            {
+                fetchCallCount: 1,
+                verificationRequestCount: 2,
+                participantId: "PHASE10_TEST_PARTICIPANT",
+                body: failedState.fetchCalls[0].body,
+            },
+            "delayed verification retries only JSONP with the same payload",
+        );
+
+        const postTimeoutState = await client.evaluate(`
+            (() => {
+                resetSubmissionState();
+                window.__phase10.fetchCalls = [];
+                window.__phase10.verificationRequests = [];
+                window.__phase10.verificationResults = ["success"];
+                window.fetch = async (url, options) => {
+                    window.__phase10.fetchCalls.push({
+                        url: String(url),
+                        body: options?.body
+                    });
+                    await new Promise((resolveDelay) =>
+                        setTimeout(resolveDelay, 10)
+                    );
+                    throw new DOMException("Aborted", "AbortError");
+                };
+                document.querySelector("#submit-results").click();
+                return true;
+            })()
+        `);
+        assert.equal(postTimeoutState, true);
+        await waitFor(
+            client,
+            `document.querySelector("#submission-status").textContent.trim() === "Your responses have been saved successfully."`,
+            "verification after POST timeout",
+        );
+        assert.deepEqual(
+            await client.evaluate(`
+                ({
+                    fetchCallCount: window.__phase10.fetchCalls.length,
+                    verificationRequestCount:
+                        window.__phase10.verificationRequests.length,
+                    body: window.__phase10.fetchCalls[0]?.body
+                })
+            `),
+            {
+                fetchCallCount: 1,
+                verificationRequestCount: 1,
+                body: failedState.fetchCalls[0].body,
+            },
+            "a timed-out POST is confirmed without a second POST",
+        );
+
+        const temporaryNetworkFailureState = await client.evaluate(`
+            (() => {
+                resetSubmissionState();
+                window.__phase10.fetchCalls = [];
+                window.__phase10.verificationRequests = [];
+                window.__phase10.verificationResults = ["error", "error", "error"];
                 window.fetch = async (url, options) => {
                     window.__phase10.fetchCalls.push({
                         url: String(url),
@@ -490,10 +681,11 @@ async function run() {
                 return true;
             })()
         `);
+        assert.equal(temporaryNetworkFailureState, true);
         await waitFor(
             client,
-            `document.querySelector("#submission-status").textContent.trim() === "We couldn't confirm that your responses were saved. Please try again."`,
-            "network error submission state",
+            `document.querySelector("#submission-status").textContent.trim() === "We couldn't confirm that your responses were saved yet. Check again without resubmitting."`,
+            "network error unconfirmed state",
         );
         const networkErrorState = await client.evaluate(`
             ({
@@ -502,17 +694,21 @@ async function run() {
                     window.__phase10.verificationRequests.length,
                 participantId: participantSession.participantId,
                 assessmentAnswerCount: participantSession.assessmentAnswers.length,
+                submitText: document.querySelector("#submit-results").textContent.trim(),
                 viewResultsHidden: document.querySelector("#view-results").hidden,
-                resultsHidden: document.querySelector("#results-screen").hidden
+                resultsHidden: document.querySelector("#results-screen").hidden,
+                body: window.__phase10.fetchCalls[0]?.body
             })
         `);
         assert.deepEqual(networkErrorState, {
             fetchCallCount: 1,
             verificationRequestCount: 3,
             participantId: "PHASE10_TEST_PARTICIPANT",
-            assessmentAnswerCount: 8,
+            assessmentAnswerCount: 4,
+            submitText: "Check Submission Again",
             viewResultsHidden: true,
             resultsHidden: true,
+            body: failedState.fetchCalls[0].body,
         });
 
         const timeoutCleanup = await client.evaluate(`
@@ -538,50 +734,44 @@ async function run() {
             callbackRemoved: true,
         });
 
-        const retrySubmitting = await client.evaluate(`
+        const staleCallbackState = await client.evaluate(`
             (() => {
-                window.__phase10.verificationMode = "success";
-                document.querySelector("#submit-results").click();
+                const staleRequest = window.__phase10.verificationRequests[0];
+                staleRequest.callback?.({
+                    participantId: participantSession.participantId,
+                    saved: true
+                });
                 return {
-                    buttonText: document.querySelector("#submit-results").textContent.trim(),
-                    buttonDisabled: document.querySelector("#submit-results").disabled,
-                    status: document.querySelector("#submission-status").textContent.trim()
+                    state: submissionState,
+                    status: document.querySelector("#submission-status").textContent.trim(),
+                    viewResultsHidden: document.querySelector("#view-results").hidden
                 };
             })()
         `);
-        assert.deepEqual(retrySubmitting, {
-            buttonText: "Submitting...",
-            buttonDisabled: true,
-            status: "Submitting your responses...",
+        assert.deepEqual(staleCallbackState, {
+            state: "unconfirmed",
+            status:
+                "We couldn't confirm that your responses were saved yet. Check again without resubmitting.",
+            viewResultsHidden: true,
         });
+
+        await client.evaluate(`
+            (() => {
+                window.__phase10.verificationResults = ["success"];
+                document.querySelector("#submit-results").click();
+                return true;
+            })()
+        `);
         await waitFor(
             client,
             `document.querySelector("#submission-status").textContent.trim() === "Your responses have been saved successfully."`,
-            "verified retry",
+            "verified recovery",
         );
-
-        const successState = await client.evaluate(`
-            ({
-                fetchCallCount: window.__phase10.fetchCalls.length,
-                verificationRequestCount: window.__phase10.verificationRequests.length,
-                participantId: participantSession.participantId,
-                submitHidden: document.querySelector("#submit-results").hidden,
-                viewResultsText: document.querySelector("#view-results").textContent.trim(),
-                viewResultsDisabled: document.querySelector("#view-results").disabled,
-                viewResultsHidden: document.querySelector("#view-results").hidden,
-                resultsHidden: document.querySelector("#results-screen").hidden
-            })
-        `);
-        assert.deepEqual(successState, {
-            fetchCallCount: 1,
-            verificationRequestCount: 5,
-            participantId: "PHASE10_TEST_PARTICIPANT",
-            submitHidden: true,
-            viewResultsText: "View Results",
-            viewResultsDisabled: false,
-            viewResultsHidden: false,
-            resultsHidden: true,
-        });
+        assert.equal(
+            await client.evaluate("window.__phase10.fetchCalls.length"),
+            1,
+            "manual recovery uses verification only",
+        );
 
         await client.evaluate(
             'document.querySelector("#view-results").click(); true',
@@ -601,23 +791,24 @@ async function run() {
                 submissionControlsInResults:
                     document.querySelector("#results-screen #submit-results") !== null ||
                     document.querySelector("#results-screen #submission-status") !== null,
-                newParticipantDisabled: document.querySelector("#new-participant").disabled
+                newParticipantInResults:
+                    document.querySelector("#results-screen #new-participant") !== null
             })
         `);
         assert.deepEqual(resultsState, {
             heading: "Study complete",
-            preAccuracy: "75%",
-            postAccuracy: "75%",
-            difference: "0 percentage points",
+            preAccuracy: "50%",
+            postAccuracy: "100%",
+            difference: "+50 percentage points",
             resultsHidden: false,
             submissionControlsInResults: false,
-            newParticipantDisabled: false,
+            newParticipantInResults: false,
         });
         await captureViewport(client, "/tmp/phase10-results-mobile.png");
 
         const resetState = await client.evaluate(`
             (() => {
-                document.querySelector("#new-participant").click();
+                resetExperimentSession();
                 const resetStage = document.body.dataset.activeStage;
                 const resetParticipantId = participantSession.participantId;
                 showStage(

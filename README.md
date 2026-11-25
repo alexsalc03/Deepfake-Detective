@@ -93,37 +93,51 @@ conditions:
 - Condition 1: Round-1 uses set A; Round-2 uses set B
 - Condition 2: Round-1 uses set B; Round-2 uses set A
 
+Each round randomly selects exactly one authentic and one deepfake video from
+its assigned set. The selection is stored in the participant session, remains
+stable for the whole experiment, and does not repeat a video across the two
+rounds. Across participants, all eight configured assessment videos remain
+eligible.
+
 Each assessment shows one configured video at a time. A submitted answer is
 stored in the in-memory participant session and the assessment advances only
 after the browser has loaded the current video's metadata and all required
-responses are valid. A video loading error keeps submission disabled. The last
-Round-1 video moves to the Learning stage. Learning first presents the configured
+responses are valid. A video loading error keeps submission disabled. The
+progress label shows Video 1 of 2 and Video 2 of 2. The second Round-1 video
+moves to the Learning stage. Learning first presents the configured
 authentic/deepfake comparison and five concepts, then shows four quiz questions
-one at a time. Each answer must be checked before the next question is available.
-After all four answers are saved, the final module opens Round-2; the last
-Round-2 video moves to Submission.
+one at a time. Each answer must be checked before the next question is
+available. After all four answers are saved, the final module opens Round-2;
+the second Round-2 video moves to Submission.
 
 Participant state is held in the existing `participantSession` object in
 `js/app.js`. It includes the participant ID, consent and demographic responses,
-the assigned condition and video sets, assessment progress by stage, and the
-submitted assessment answers. Learning state records completed module IDs,
-checked quiz answers, and whether all modules are complete. Nothing is persisted
-to localStorage; completed results are sent only when the participant selects
-Submit Results.
+the assigned condition and video sets, the selected video IDs, assessment
+progress by stage, and the submitted assessment answers. Learning state records
+completed module IDs, checked quiz answers, and whether all modules are
+complete. Nothing is persisted to localStorage; completed results are sent only
+when the participant selects Submit Results.
 
 The Submission stage prepares a JSON-serializable payload with the participant,
 demographic, condition, assessment, learning, and calculated performance data.
-Submit Results sends that payload to the configured Google Apps Script Web App
-and then verifies the participant ID through its JSONP GET endpoint. The
-interface reports success only after positive verification. Failed or
-unconfirmed requests keep the participant session in memory and can be retried
-with the same participant ID and payload.
+Each round contributes two responses, for four assessment responses per
+participant. Submit Results sends that payload once to the configured Google
+Apps Script Web App and then verifies the participant ID through its JSONP GET
+endpoint. Verification retries do not resend the POST. If verification remains
+inconclusive, **Check Submission Again** repeats only the verification using
+the preserved participant ID and payload. The interface reports success only
+after positive verification.
+
+The backend checks for the participant ID and performs both spreadsheet writes
+while holding the Apps Script script lock. Repeated or concurrent requests with
+the same participant ID return a successful duplicate acknowledgement without
+adding another participant row or duplicate video-response rows.
 
 The Results stage calculates correct classifications, accuracy, and average
 confidence from the in-memory assessment answers and the labels in
 `data/videos.json`. Results are not rendered or accessible until submission
-verification succeeds. New Participant resets the participant session and
-submission status before returning to Welcome.
+verification succeeds. The final Results screen includes a thank-you message
+and does not provide a New Participant button.
 
 ## Research content
 
@@ -231,9 +245,10 @@ current configuration uses a `content` module followed by a `quiz` module.
 
 ### Video configuration
 
-`data/videos.json` is an array. Array order defines the fixed order of videos
-within each set. IDs and local file paths must be unique across the file so a
-video cannot appear in both assessments.
+`data/videos.json` is an array of eight available assessment videos. IDs and
+local file paths must be unique across the file so a video cannot appear in
+both rounds. For each participant, the application selects one `real` and one
+`fake` video from each assigned set.
 
 ```json
 [
@@ -249,8 +264,9 @@ video cannot appear in both assessments.
 
 - `file` must be a local path, not an external URL.
 - `label` must be `real` or `fake`.
-- `set` must be `A` or `B`. The current study design uses four videos in each
-  set, balanced between two `real` and two `fake` labels.
+- `set` must be `A` or `B`. The current study design uses four available
+  videos in each set, balanced between two `real` and two `fake` labels. Only
+  two videos from each set are selected for a participant.
 - `source` and `label` are available in the configuration but are not displayed
   during the assessment.
 - `source` may be an empty string only while temporary test content is in use.
@@ -318,12 +334,14 @@ With Google Chrome installed, run:
 ```bash
 node tests/phase5-learning-check.mjs
 node tests/phase6-results-check.mjs
+node tests/phase10-submission-gate-check.mjs
 node tests/gsbackend-contract-check.mjs
 ```
 
 The scripts start temporary local server and Chrome processes. Together they
-verify the assessment and learning flow, result calculations, submission
-payload, complete session reset, responsive widths, and browser console errors.
+verify two-video rounds, stable balanced video selection, learning preservation,
+result calculations, submission verification retries, idempotent backend
+writes, responsive widths, and browser console errors.
 
 The live submission check is opt-in because it sends one synthetic result to
 the configured Google Sheet:

@@ -372,20 +372,6 @@ function testSubmission() {
             classification: "real",
             confidence: 75,
             selectedClues: ["general_impression"]
-          },
-          {
-            videoId: "b-01",
-            correctLabel: "fake",
-            classification: "fake",
-            confidence: 75,
-            selectedClues: ["general_impression"]
-          },
-          {
-            videoId: "b-02",
-            correctLabel: "real",
-            classification: "real",
-            confidence: 75,
-            selectedClues: ["general_impression"]
           }
         ]
       },
@@ -400,20 +386,6 @@ function testSubmission() {
           },
           {
             videoId: "t-04",
-            correctLabel: "real",
-            classification: "real",
-            confidence: 75,
-            selectedClues: ["general_impression"]
-          },
-          {
-            videoId: "b-03",
-            correctLabel: "fake",
-            classification: "fake",
-            confidence: 75,
-            selectedClues: ["general_impression"]
-          },
-          {
-            videoId: "b-04",
             correctLabel: "real",
             classification: "real",
             confidence: 75,
@@ -439,14 +411,14 @@ function testSubmission() {
 
     performance: {
       pre: {
-        correctClassifications: 4,
-        totalClassifications: 4,
+        correctClassifications: 2,
+        totalClassifications: 2,
         accuracyPercent: 100,
         averageConfidencePercent: 75
       },
       post: {
-        correctClassifications: 4,
-        totalClassifications: 4,
+        correctClassifications: 2,
+        totalClassifications: 2,
         accuracyPercent: 100,
         averageConfidencePercent: 75
       },

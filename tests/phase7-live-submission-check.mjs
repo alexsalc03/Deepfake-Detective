@@ -199,19 +199,19 @@ async function run() {
                 };
                 participantSession.condition = 1;
                 participantSession.videoSets = { pre: "A", post: "B" };
+                participantSession.selectedVideoIds = {
+                    pre: ["t-01", "t-02"],
+                    post: ["t-03", "t-04"]
+                };
                 participantSession.assessmentAnswers = [
                     { stage: "pre", videoId: "t-01", videoPosition: 1, answer: "fake", confidence: 50, clues: ["general_impression"] },
                     { stage: "pre", videoId: "t-02", videoPosition: 2, answer: "real", confidence: 50, clues: ["general_impression"] },
-                    { stage: "pre", videoId: "b-01", videoPosition: 3, answer: "fake", confidence: 50, clues: ["general_impression"] },
-                    { stage: "pre", videoId: "b-02", videoPosition: 4, answer: "real", confidence: 50, clues: ["general_impression"] },
                     { stage: "post", videoId: "t-03", videoPosition: 1, answer: "fake", confidence: 50, clues: ["general_impression"] },
-                    { stage: "post", videoId: "t-04", videoPosition: 2, answer: "real", confidence: 50, clues: ["general_impression"] },
-                    { stage: "post", videoId: "b-03", videoPosition: 3, answer: "fake", confidence: 50, clues: ["general_impression"] },
-                    { stage: "post", videoId: "b-04", videoPosition: 4, answer: "real", confidence: 50, clues: ["general_impression"] }
+                    { stage: "post", videoId: "t-04", videoPosition: 2, answer: "real", confidence: 50, clues: ["general_impression"] }
                 ];
                 participantSession.assessmentProgress = {
-                    pre: { videoIndex: 4 },
-                    post: { videoIndex: 4 }
+                    pre: { videoIndex: 2 },
+                    post: { videoIndex: 2 }
                 };
                 participantSession.learning = {
                     completedModuleIds: ["deepfake-clues", "check-understanding"],
@@ -233,12 +233,12 @@ async function run() {
             ({
                 idMatches: participantSession.participantId === window.__liveTestParticipantId,
                 submitHidden: document.querySelector("#submit-results").hidden,
-                newParticipantDisabled: document.querySelector("#new-participant").disabled
+                newParticipantPresent: document.querySelector("#new-participant") !== null
             })
         `);
         assert.equal(result.idMatches, true);
         assert.equal(result.submitHidden, true);
-        assert.equal(result.newParticipantDisabled, false);
+        assert.equal(result.newParticipantPresent, false);
         assert.equal(consoleErrors.length, 0, "no browser console errors");
         console.log("Phase 7 live Google Sheets submission check passed.");
     } finally {

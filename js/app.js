@@ -127,7 +127,6 @@ const submissionScreen = document.querySelector("#submission-screen");
 const submissionLoading = document.querySelector("#submission-loading");
 const submitResultsButton = document.querySelector("#submit-results");
 const viewResultsButton = document.querySelector("#view-results");
-const newParticipantButton = document.querySelector("#new-participant");
 const supportedQuestionTypes = new Set([
     "text",
     "number",
@@ -153,7 +152,6 @@ let currentLearningQuestionIndex = 0;
 let submissionState = "idle";
 let pendingSubmissionParticipantId = null;
 let pendingSubmissionBody = null;
-let submissionMayHaveSucceeded = false;
 
 const participantSession = {
     participantId: null,
@@ -163,6 +161,10 @@ const participantSession = {
     videoSets: {
         pre: null,
         post: null,
+    },
+    selectedVideoIds: {
+        pre: [],
+        post: [],
     },
     currentStage: null,
     assessmentAnswers: [],
@@ -943,6 +945,50 @@ function assignParticipantCondition() {
         participantSession.condition === 1
             ? { pre: "A", post: "B" }
             : { pre: "B", post: "A" };
+    selectAssessmentVideos();
+}
+
+function selectAssessmentVideosForSet(assignedSet) {
+    const videosInSet = assessmentVideos.filter(
+        (video) => video.set === assignedSet,
+    );
+    const randomVideo = (label) => {
+        const candidates = videosInSet.filter((video) => video.label === label);
+        return candidates[Math.floor(Math.random() * candidates.length)];
+    };
+    const selected = [randomVideo("real"), randomVideo("fake")];
+
+    if (Math.random() < 0.5) {
+        selected.reverse();
+    }
+
+    return selected.filter(Boolean).map((video) => video.id);
+}
+
+function selectAssessmentVideos() {
+    if (!assessmentContentReady || participantSession.condition === null) {
+        return;
+    }
+
+    participantSession.selectedVideoIds = {
+        pre: selectAssessmentVideosForSet(participantSession.videoSets.pre),
+        post: selectAssessmentVideosForSet(participantSession.videoSets.post),
+    };
+}
+
+function ensureAssessmentVideoSelection() {
+    const selectedIds = participantSession.selectedVideoIds;
+    const hasCompleteSelection = ["pre", "post"].every(
+        (mode) =>
+            selectedIds[mode].length === 2 &&
+            selectedIds[mode].every((videoId) =>
+                assessmentVideos.some((video) => video.id === videoId),
+            ),
+    );
+
+    if (!hasCompleteSelection) {
+        selectAssessmentVideos();
+    }
 }
 
 function setParticipationUnavailable(message, isError = false) {
@@ -1241,6 +1287,7 @@ function initialiseAssessmentContent(videoConfig, questionConfig) {
     assessmentContentReady = true;
     assessmentConfigStatus.hidden = true;
     assessmentConfigStatus.classList.remove("is-error");
+    selectAssessmentVideos();
 
     const currentStage = stages[currentStageIndex];
     if (currentStage.assessmentMode) {
@@ -1277,8 +1324,13 @@ function getAssessmentMode() {
 }
 
 function getAssessmentVideos(mode) {
-    const assignedSet = participantSession.videoSets[mode];
-    return assessmentVideos.filter((video) => video.set === assignedSet);
+    ensureAssessmentVideoSelection();
+
+    return participantSession.selectedVideoIds[mode]
+        .map((videoId) =>
+            assessmentVideos.find((video) => video.id === videoId),
+        )
+        .filter(Boolean);
 }
 
 function getScoredAssessmentResponses(mode) {
@@ -1394,32 +1446,34 @@ function prepareSubmissionPayload() {
 
 function setSubmissionState(state) {
     submissionState = state;
+    const isBusy = state === "posting" || state === "verifying";
     submitResultsButton.hidden = state === "success";
-    submitResultsButton.disabled = state === "submitting" || state === "success";
-    submitResultsButton.textContent =
-        state === "submitting"
-            ? "Submitting..."
-            : state === "failure"
-              ? "Retry Submission"
-              : "Submit Results";
+    submitResultsButton.disabled = isBusy || state === "success";
+    const buttonLabels = {
+        posting: "Submitting...",
+        verifying: "Verifying Submission...",
+        unconfirmed: "Check Submission Again",
+    };
+    submitResultsButton.textContent = buttonLabels[state] ?? "Submit Results";
     viewResultsButton.hidden = state !== "success";
     viewResultsButton.disabled = state !== "success";
-    submissionLoading.hidden = state !== "submitting";
+    submissionLoading.hidden = !isBusy;
     submissionScreen.setAttribute(
         "aria-busy",
-        state === "submitting" ? "true" : "false",
+        isBusy ? "true" : "false",
     );
-    newParticipantButton.disabled = state !== "success";
-
-    if (state === "submitting") {
+    if (state === "posting") {
         submissionStatus.textContent = "Submitting your responses...";
+    } else if (state === "verifying") {
+        submissionStatus.textContent =
+            "Checking that your responses were saved...";
     } else if (state === "success") {
         submissionStatus.textContent =
             "Your responses have been saved successfully.";
         viewResultsButton.focus();
-    } else if (state === "failure") {
+    } else if (state === "unconfirmed") {
         submissionStatus.textContent =
-            "We couldn't confirm that your responses were saved. Please try again.";
+            "We couldn't confirm that your responses were saved yet. Check again without resubmitting.";
     } else {
         submissionStatus.textContent = "Your results have not been submitted.";
     }
@@ -1539,53 +1593,86 @@ async function postSubmission(
 }
 
 async function handleResultsSubmission() {
-    if (submissionState === "submitting" || submissionState === "success") {
+    if (
+        submissionState === "posting" ||
+        submissionState === "verifying" ||
+        submissionState === "success"
+    ) {
         return;
     }
 
     const participantId = participantSession.participantId;
     if (!participantId) {
-        setSubmissionState("failure");
+        submissionStatus.textContent =
+            "Your participant ID is unavailable. Please return to Welcome and start again.";
         return;
     }
 
-    if (pendingSubmissionParticipantId !== participantId) {
-        pendingSubmissionParticipantId = participantId;
-        pendingSubmissionBody = JSON.stringify(prepareSubmissionPayload());
-        submissionMayHaveSucceeded = false;
-    }
-
-    setSubmissionState("submitting");
-
-    if (submissionMayHaveSucceeded) {
-        try {
-            await verifySubmissionWithRetries(participantId);
-            setSubmissionState("success");
+    if (submissionState === "unconfirmed") {
+        if (pendingSubmissionParticipantId !== participantId) {
+            resetSubmissionState();
             return;
-        } catch {
-            // A previous request was not confirmed, so retry the same payload.
         }
+
+        await verifyPendingSubmission(participantId);
+        return;
     }
 
-    submissionMayHaveSucceeded = true;
+    if (submissionState !== "idle") {
+        return;
+    }
+
+    pendingSubmissionParticipantId = participantId;
+    pendingSubmissionBody = JSON.stringify(prepareSubmissionPayload());
+    setSubmissionState("posting");
+
     try {
         await postSubmission(pendingSubmissionBody);
     } catch {
         // Delivery is ambiguous, so verification remains the source of truth.
     }
 
+    if (
+        pendingSubmissionParticipantId !== participantId ||
+        participantSession.participantId !== participantId
+    ) {
+        return;
+    }
+
+    await verifyPendingSubmission(participantId);
+}
+
+async function verifyPendingSubmission(participantId) {
+    if (
+        pendingSubmissionParticipantId !== participantId ||
+        participantSession.participantId !== participantId
+    ) {
+        return;
+    }
+
+    setSubmissionState("verifying");
+
     try {
         await verifySubmissionWithRetries(participantId);
-        setSubmissionState("success");
+        if (
+            submissionState === "verifying" &&
+            pendingSubmissionParticipantId === participantId
+        ) {
+            setSubmissionState("success");
+        }
     } catch {
-        setSubmissionState("failure");
+        if (
+            submissionState === "verifying" &&
+            pendingSubmissionParticipantId === participantId
+        ) {
+            setSubmissionState("unconfirmed");
+        }
     }
 }
 
 function resetSubmissionState() {
     pendingSubmissionParticipantId = null;
     pendingSubmissionBody = null;
-    submissionMayHaveSucceeded = false;
     setSubmissionState("idle");
 }
 
@@ -1652,6 +1739,10 @@ function resetExperimentSession() {
         videoSets: {
             pre: null,
             post: null,
+        },
+        selectedVideoIds: {
+            pre: [],
+            post: [],
         },
         currentStage: null,
         assessmentAnswers: [],
@@ -2615,11 +2706,6 @@ viewResultsButton.addEventListener("click", () => {
     }
 
     showStage(stages.findIndex((stage) => stage.id === "results"));
-});
-newParticipantButton.addEventListener("click", () => {
-    if (submissionState === "success") {
-        resetExperimentSession();
-    }
 });
 learningQuizControls.addEventListener("change", (event) => {
     if (!event.target.matches('input[name="learning-quiz-answer"]')) {

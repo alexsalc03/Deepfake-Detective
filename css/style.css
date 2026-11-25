@@ -1257,10 +1257,6 @@ fieldset.form-question {
     margin-top: 20px;
 }
 
-.results-actions {
-    justify-content: flex-start;
-}
-
 .app-footer {
     margin-top: 44px;
     padding-top: 16px;
@@ -1432,8 +1428,7 @@ fieldset.form-question {
         gap: 10px;
     }
 
-    .submission-actions .button,
-    .results-actions .button {
+    .submission-actions .button {
         width: 100%;
     }
 
