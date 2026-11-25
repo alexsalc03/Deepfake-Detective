@@ -515,6 +515,27 @@ function currentPayload() {
         'verifyResult({"participantId":"CONTRACT_TEST","saved":true});',
         "JSONP verification reports a saved participant",
     );
+
+    const missingCallbackLookup = savedBackend.doGet({
+        parameter: { participantId: "CONTRACT_TEST" },
+    });
+    assert.equal(
+        missingCallbackLookup.content,
+        "Invalid callback",
+        "JSONP verification rejects a missing callback parameter",
+    );
+
+    const invalidCallbackLookup = savedBackend.doGet({
+        parameter: {
+            participantId: "CONTRACT_TEST",
+            callback: "bad();alert(1)//",
+        },
+    });
+    assert.equal(
+        invalidCallbackLookup.content,
+        "Invalid callback",
+        "JSONP verification rejects executable callback code",
+    );
 }
 
 {

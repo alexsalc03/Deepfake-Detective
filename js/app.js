@@ -35,7 +35,8 @@ const submissionEndpoint =
     "https://script.google.com/macros/s/AKfycbwdisKpuSpKqWfSp8NrXfl48oPQ3LTxofn6kJzF3KznLjaSqs3GwQFVqQceikYjMsqw2g/exec";
 const submissionVerificationAttempts = 3;
 const submissionVerificationDelayMilliseconds = 750;
-const submissionVerificationTimeoutMilliseconds = 4000;
+// Apps Script can take several seconds to cold-start and query the sheet.
+const submissionVerificationTimeoutMilliseconds = 12000;
 const submissionPostTimeoutMilliseconds = 10000;
 
 const screens = [...document.querySelectorAll("[data-screen]")];

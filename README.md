@@ -44,7 +44,8 @@ deepfake-detective/
 │   ├── phase5-learning-check.mjs
 │   ├── phase6-results-check.mjs
 │   ├── phase7-live-submission-check.mjs
-│   └── phase10-submission-gate-check.mjs
+│   ├── phase10-submission-gate-check.mjs
+│   └── submission-jsonp-check.mjs
 ├── .gitignore
 └── README.md
 ```
@@ -126,7 +127,8 @@ Apps Script Web App and then verifies the participant ID through its JSONP GET
 endpoint. Verification retries do not resend the POST. If verification remains
 inconclusive, **Check Submission Again** repeats only the verification using
 the preserved participant ID and payload. The interface reports success only
-after positive verification.
+after positive verification. Each JSONP attempt allows up to 12 seconds for
+Apps Script startup and sheet lookup before it is treated as inconclusive.
 
 The backend checks for the participant ID and performs both spreadsheet writes
 while holding the Apps Script script lock. Repeated or concurrent requests with
@@ -335,6 +337,7 @@ With Google Chrome installed, run:
 node tests/phase5-learning-check.mjs
 node tests/phase6-results-check.mjs
 node tests/phase10-submission-gate-check.mjs
+node tests/submission-jsonp-check.mjs
 node tests/gsbackend-contract-check.mjs
 ```
 
