@@ -354,8 +354,8 @@ function currentPayload() {
         participantId: "CONTRACT_TEST",
         demographics: {
             age: 23,
-            gender: "Female",
-            nationality: "Swiss and Italian",
+            gender: "Non-binary",
+            nationality: "Italy; Switzerland",
             education_level: "University degree",
             political_leaning: 4,
             ai_sentiment: "Equally concerned and excited",
@@ -388,7 +388,7 @@ function currentPayload() {
                 "deepfake-clues",
                 "check-understanding",
             ],
-            quizAnswers: { q1: "c", q3: "a", q4: "c" },
+            quizAnswers: { q1: "a", q3: "a", q4: "c" },
             isComplete: true,
         },
         performance: {
@@ -479,8 +479,13 @@ function currentPayload() {
     );
     assert.equal(
         participants.rows[0][PARTICIPANT_HEADERS.length - 1],
-        "Swiss and Italian",
+        "Italy; Switzerland",
         "nationality is written to its appended dedicated column",
+    );
+    assert.equal(
+        participants.rows[0][3],
+        "Non-binary",
+        "the expanded gender value is stored in the existing Gender column",
     );
     assert.equal(
         participants.rows[0].length,
@@ -494,7 +499,7 @@ function currentPayload() {
     );
     assert.equal(
         participants.rows[0][14],
-        '{"q1":"c","q3":"a","q4":"c"}',
+        '{"q1":"a","q3":"a","q4":"c"}',
         "all three quiz answers are serialized into the existing JSON column",
     );
     assert.equal(responses.rows.length, 8, "all eight video responses are saved");

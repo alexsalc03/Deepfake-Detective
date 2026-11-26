@@ -143,20 +143,39 @@ async function completeDemographics(client) {
             require(ageInput.min === "18", "Age input starts at 18");
             require(ageInput.max === "100", "Age input preserves its upper limit");
             require(
-                JSON.stringify(genderOptions) === JSON.stringify(["Male", "Female"]),
-                "Gender renders only Male and Female"
+                JSON.stringify(genderOptions) ===
+                    JSON.stringify(["Male", "Female", "Non-binary", "Prefer not to answer"]),
+                "Gender renders all four approved options"
             );
             require(
-                document.querySelector("#demographic-nationality")?.type === "text",
-                "Nationality uses the existing text-question architecture"
+                document.querySelector("#demographic-nationality")?.getAttribute("role") === "combobox",
+                "Nationality uses a searchable combobox"
             );
             require(
-                getQuestionElement("nationality").querySelector(".question-help").textContent.includes("Prefer not to say"),
-                "Nationality provides a Prefer not to say response"
+                getQuestionElement("nationality").querySelector(".question-help").textContent.includes("second nationality"),
+                "Nationality explains the optional second selection"
             );
+            const selectNationality = (selector, query, optionText) => {
+                const input = document.querySelector(selector);
+                input.focus();
+                input.value = query;
+                input.dispatchEvent(new InputEvent("input", { bubbles: true }));
+                const option = [
+                    ...document.querySelectorAll(
+                        "#" + input.getAttribute("aria-controls") + ' [role="option"]'
+                    )
+                ].find(({ textContent }) => textContent === optionText);
+                require(option, optionText + " is available");
+                option.click();
+            };
             setValue("#demographic-age", "17");
             setValue("#demographic-gender", "Female", "change");
-            setValue("#demographic-nationality", "Swiss and Italian");
+            selectNationality("#demographic-nationality", "It", "Italy");
+            selectNationality(
+                "#demographic-nationality-additional",
+                "Swi",
+                "Switzerland"
+            );
             setValue("#demographic-education_level", "University degree", "change");
             const scale = document.querySelector('[data-demographic-id="political_leaning"] input[type="range"]');
             scale.value = "4";
@@ -709,7 +728,7 @@ async function run() {
         assert.equal(payload.participantId.length > 0, true);
         assert.equal(payload.demographics.age, 25);
         assert.equal(payload.demographics.gender, "Female");
-        assert.equal(payload.demographics.nationality, "Swiss and Italian");
+        assert.equal(payload.demographics.nationality, "Italy; Switzerland");
         assert.equal(payload.demographics.education_level, "University degree");
         assert.equal(payload.demographics.political_leaning, 4);
         assert.equal(payload.demographics.ai_sentiment, "Unsure");

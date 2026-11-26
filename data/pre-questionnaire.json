@@ -17,15 +17,18 @@
             "required": true,
             "options": [
                 "Male",
-                "Female"
+                "Female",
+                "Non-binary",
+                "Prefer not to answer"
             ],
             "section": "demographics"
         },
         {
             "id": "nationality",
             "label": "What is your nationality?",
-            "helpText": "Enter more than one nationality if applicable, or enter “Prefer not to say”.",
-            "type": "text",
+            "helpText": "Start typing to search the list. You can add a second nationality if applicable.",
+            "type": "nationality",
+            "allowMultiple": true,
             "required": true,
             "section": "demographics"
         },

@@ -40,23 +40,23 @@
     "questions": [
       {
         "id": "q1",
-        "question": "Which of these best describes the mistakes people made in the study?",
+        "question": "You have just watched a clip and you feel sure it is authentic. How much does that feeling tell you?",
         "options": [
           {
             "id": "a",
-            "text": "They were often unsure, so they guessed and got it wrong"
+            "text": "Not much on its own, because people feel just as sure when they are wrong"
           },
           {
             "id": "b",
-            "text": "They were too suspicious and kept calling real videos fake"
+            "text": "A lot, because nothing looked or sounded off while you were watching"
           },
           {
             "id": "c",
-            "text": "They believed fakes were real and felt just as sure as usual"
+            "text": "It depends, because the feeling is reliable for video but not for audio"
           }
         ],
-        "correctOptionId": "c",
-        "feedback": "People felt just as confident when they were wrong, so feeling sure doesn't tell you much."
+        "correctOptionId": "a",
+        "feedback": "Confidence alone is not a reliable indicator of authenticity. People can feel equally certain even when their judgement is incorrect."
       },
       {
         "id": "q3",

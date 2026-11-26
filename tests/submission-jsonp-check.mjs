@@ -427,7 +427,7 @@ async function run() {
                 };
                 participantSession.learning = {
                     completedModuleIds: ["deepfake-clues", "check-understanding"],
-                    selectedQuizAnswers: { q1: "c", q3: "a", q4: "c" },
+                    selectedQuizAnswers: { q1: "a", q3: "a", q4: "c" },
                     isComplete: true
                 };
                 window.__jsonpSubmission = {

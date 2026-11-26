@@ -144,19 +144,39 @@ async function completeDemographics(client) {
             const require = (condition, message) => { if (!condition) throw new Error(message); };
             require(
                 JSON.stringify([...document.querySelector("#demographic-gender").options].slice(1).map(({ value }) => value)) ===
-                    JSON.stringify(["Male", "Female"]),
-                "Gender renders only Male and Female"
+                    JSON.stringify(["Male", "Female", "Non-binary", "Prefer not to answer"]),
+                "Gender renders all four approved options"
             );
             const nationality = document.querySelector("#demographic-nationality");
-            require(nationality?.type === "text", "Nationality renders as a text field");
             require(
-                getQuestionElement("nationality").querySelector(".question-help").textContent.includes("more than one") &&
-                    getQuestionElement("nationality").querySelector(".question-help").textContent.includes("Prefer not to say"),
-                "Nationality explains multiple answers and the opt-out response"
+                nationality?.getAttribute("role") === "combobox",
+                "Nationality renders as a searchable combobox"
+            );
+            require(
+                getQuestionElement("nationality").querySelector(".question-help").textContent.includes("second nationality"),
+                "Nationality explains the optional second selection"
             );
             setValue("#demographic-age", "25");
             setValue("#demographic-gender", "Male", "change");
-            setValue("#demographic-nationality", "Swiss, Italian");
+            const selectNationality = (selector, query, optionText) => {
+                const input = document.querySelector(selector);
+                input.focus();
+                input.value = query;
+                input.dispatchEvent(new InputEvent("input", { bubbles: true }));
+                const option = [
+                    ...document.querySelectorAll(
+                        "#" + input.getAttribute("aria-controls") + ' [role="option"]'
+                    )
+                ].find(({ textContent }) => textContent === optionText);
+                require(option, optionText + " is available");
+                option.click();
+            };
+            selectNationality("#demographic-nationality", "It", "Italy");
+            selectNationality(
+                "#demographic-nationality-additional",
+                "Swi",
+                "Switzerland"
+            );
             setValue("#demographic-education_level", "University degree", "change");
             const scale = document.querySelector('[data-demographic-id="political_leaning"] input[type="range"]');
             scale.value = "4";
@@ -184,7 +204,7 @@ async function completeDemographics(client) {
         {
             age: 25,
             gender: "Male",
-            nationality: "Swiss, Italian",
+            nationality: "Italy; Switzerland",
             education: "University degree",
         },
         "the demographic answers are stored without affecting neighboring fields",
@@ -551,7 +571,8 @@ async function run() {
             `),
             {
                 progress: "Question 1 of 3",
-                question: "Which of these best describes the mistakes people made in the study?",
+                question:
+                    "You have just watched a clip and you feel sure it is authentic. How much does that feeling tell you?",
                 options: 3,
                 feedbackHidden: true,
                 checkDisabled: true,
@@ -563,7 +584,7 @@ async function run() {
         const quizQuestionIds = ["q1", "q3", "q4"];
         const quizSelections = ["a", "a", "c"];
         const expectedFeedback = [
-            "People felt just as confident when they were wrong, so feeling sure doesn't tell you much.",
+            "Confidence alone is not a reliable indicator of authenticity. People can feel equally certain even when their judgement is incorrect.",
             "AI can copy a voice almost perfectly, so a voice that sounds right doesn't prove much on its own.",
             "Judging by quality was right only about half the time, no better than guessing.",
         ];
@@ -619,7 +640,7 @@ async function run() {
                     }))()
                 `),
                 {
-                    result: questionIndex === 0 ? "Incorrect" : "Correct",
+                    result: "Correct",
                     feedback: expectedFeedback[questionIndex],
                     locked: true,
                     saved: quizSelections[questionIndex],

@@ -371,6 +371,62 @@ fieldset.form-question {
     box-shadow: 0 0 0 1px var(--error);
 }
 
+.nationality-combobox {
+    position: relative;
+}
+
+.nationality-combobox.is-disabled {
+    opacity: 0.65;
+}
+
+.nationality-options {
+    position: absolute;
+    z-index: 10;
+    top: calc(100% + 4px);
+    right: 0;
+    left: 0;
+    max-height: 228px;
+    overflow-y: auto;
+    margin: 0;
+    padding: 4px;
+    border: 1px solid var(--control-line);
+    border-radius: 7px;
+    background: var(--surface);
+    box-shadow: 0 8px 24px rgba(29, 29, 31, 0.12);
+    list-style: none;
+    overscroll-behavior: contain;
+}
+
+.nationality-option {
+    min-height: 40px;
+    padding: 9px 10px;
+    border-radius: 5px;
+    color: var(--text);
+    font-size: 0.88rem;
+    line-height: 1.35;
+    cursor: pointer;
+}
+
+.nationality-option:hover,
+.nationality-option.is-active {
+    background: var(--accent-soft);
+}
+
+.nationality-option[aria-selected="true"] {
+    color: var(--focus);
+}
+
+.nationality-empty {
+    padding: 10px;
+    color: var(--text-secondary);
+    font-size: 0.84rem;
+    line-height: 1.4;
+}
+
+.nationality-additional-label {
+    margin-top: 16px;
+}
+
 .choice-list {
     display: grid;
     gap: 4px;

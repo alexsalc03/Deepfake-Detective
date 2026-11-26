@@ -129,14 +129,20 @@ const supportedQuestionTypes = new Set([
     "text",
     "number",
     "select",
+    "nationality",
     "radio",
     "checkbox",
     "range",
+]);
+const exclusiveNationalityValues = new Set([
+    "Prefer not to answer",
+    "Stateless",
 ]);
 
 let currentStageIndex = 0;
 let introStep = 0;
 let demographicsConfig = null;
+let nationalityOptions = [];
 let formReady = false;
 let assessmentQuestionsConfig = null;
 let assessmentVideos = [];
@@ -397,6 +403,323 @@ function createChoiceQuestion(question) {
     return fieldset;
 }
 
+function normaliseNationalitySearch(value) {
+    return String(value)
+        .normalize("NFD")
+        .replace(/\p{Diacritic}/gu, "")
+        .toLocaleLowerCase();
+}
+
+function getNationalityMatches(query) {
+    const normalisedQuery = normaliseNationalitySearch(query.trim());
+    if (!normalisedQuery) {
+        return [...nationalityOptions];
+    }
+
+    return nationalityOptions
+        .filter((option) =>
+            normaliseNationalitySearch(option).includes(normalisedQuery),
+        )
+        .sort((first, second) => {
+            const firstStartsWith = normaliseNationalitySearch(first).startsWith(
+                normalisedQuery,
+            );
+            const secondStartsWith = normaliseNationalitySearch(
+                second,
+            ).startsWith(normalisedQuery);
+
+            if (firstStartsWith !== secondStartsWith) {
+                return firstStartsWith ? -1 : 1;
+            }
+            return first.localeCompare(second, "en");
+        });
+}
+
+function createNationalityCombobox({
+    controlId,
+    describedBy,
+    required,
+    onSelect,
+}) {
+    const wrapper = createElement("div", "nationality-combobox");
+    const input = document.createElement("input");
+    const listbox = document.createElement("ul");
+    let currentOptions = [];
+    let activeOptionIndex = -1;
+
+    input.id = controlId;
+    input.name = controlId;
+    input.type = "text";
+    input.className = "text-control nationality-input";
+    input.required = required;
+    input.autocomplete = "off";
+    input.spellcheck = false;
+    input.dataset.nationalitySlot = controlId;
+    input.dataset.nationalityRequired = String(required);
+    input.setAttribute("role", "combobox");
+    input.setAttribute("aria-autocomplete", "list");
+    input.setAttribute("aria-haspopup", "listbox");
+    input.setAttribute("aria-expanded", "false");
+    input.setAttribute("aria-controls", `${controlId}-listbox`);
+    input.setAttribute("aria-describedby", describedBy);
+
+    listbox.id = `${controlId}-listbox`;
+    listbox.className = "nationality-options";
+    listbox.setAttribute("role", "listbox");
+    listbox.hidden = true;
+
+    function closeSuggestions() {
+        listbox.hidden = true;
+        input.setAttribute("aria-expanded", "false");
+        input.removeAttribute("aria-activedescendant");
+        activeOptionIndex = -1;
+    }
+
+    function setActiveOption(index) {
+        const optionElements = [
+            ...listbox.querySelectorAll('[role="option"]'),
+        ];
+        if (!optionElements.length) {
+            activeOptionIndex = -1;
+            input.removeAttribute("aria-activedescendant");
+            return;
+        }
+
+        activeOptionIndex = (index + optionElements.length) % optionElements.length;
+        optionElements.forEach((option, optionIndex) => {
+            const isActive = optionIndex === activeOptionIndex;
+            option.classList.toggle("is-active", isActive);
+            option.setAttribute("aria-selected", String(isActive));
+        });
+        input.setAttribute(
+            "aria-activedescendant",
+            optionElements[activeOptionIndex].id,
+        );
+        optionElements[activeOptionIndex].scrollIntoView({
+            block: "nearest",
+        });
+    }
+
+    function selectNationality(value) {
+        if (onSelect && onSelect(value) === false) {
+            input.value = input.dataset.selectedNationality ?? "";
+            closeSuggestions();
+            return;
+        }
+
+        input.value = value;
+        input.dataset.selectedNationality = value;
+        closeSuggestions();
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    function renderSuggestions() {
+        currentOptions = getNationalityMatches(input.value);
+        activeOptionIndex = -1;
+        listbox.replaceChildren();
+
+        currentOptions.forEach((nationality, index) => {
+            const option = createElement(
+                "li",
+                "nationality-option",
+                nationality,
+            );
+            option.id = `${controlId}-option-${index}`;
+            option.setAttribute("role", "option");
+            option.setAttribute("aria-selected", "false");
+            option.addEventListener("pointerdown", (event) => {
+                event.preventDefault();
+            });
+            option.addEventListener("click", () => {
+                selectNationality(nationality);
+            });
+            listbox.append(option);
+        });
+
+        if (!currentOptions.length) {
+            const empty = createElement(
+                "li",
+                "nationality-empty",
+                "No matching nationalities.",
+            );
+            empty.setAttribute("role", "status");
+            listbox.append(empty);
+        }
+
+        listbox.hidden = false;
+        input.setAttribute("aria-expanded", "true");
+        input.removeAttribute("aria-activedescendant");
+    }
+
+    input.addEventListener("focus", () => {
+        if (!input.disabled) {
+            renderSuggestions();
+        }
+    });
+
+    input.addEventListener("click", () => {
+        if (!input.disabled && listbox.hidden) {
+            renderSuggestions();
+        }
+    });
+
+    input.addEventListener("input", () => {
+        renderSuggestions();
+    });
+
+    input.addEventListener("keydown", (event) => {
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            if (listbox.hidden) {
+                renderSuggestions();
+            }
+            const count = listbox.querySelectorAll('[role="option"]').length;
+            if (!count) return;
+            setActiveOption(
+                activeOptionIndex === -1
+                    ? event.key === "ArrowDown"
+                        ? 0
+                        : count - 1
+                    : activeOptionIndex +
+                          (event.key === "ArrowDown" ? 1 : -1),
+            );
+            return;
+        }
+
+        if (event.key === "Enter" && activeOptionIndex >= 0) {
+            event.preventDefault();
+            selectNationality(currentOptions[activeOptionIndex]);
+            return;
+        }
+
+        if (event.key === "Escape") {
+            closeSuggestions();
+        }
+    });
+
+    input.addEventListener("blur", closeSuggestions);
+    wrapper.append(input, listbox);
+
+    demographicsForm.addEventListener("reset", () => {
+        input.value = "";
+        delete input.dataset.selectedNationality;
+        closeSuggestions();
+    });
+
+    return {
+        wrapper,
+        input,
+        closeSuggestions,
+    };
+}
+
+function createNationalityQuestion(question) {
+    const container = createElement("div", "form-question");
+    container.dataset.demographicQuestion = "";
+    container.dataset.demographicId = question.id;
+
+    const label = createElement("label", "question-label", question.label);
+    label.htmlFor = getQuestionControlId(question.id);
+
+    const help = createElement("p", "question-help", question.helpText);
+    help.id = `${getQuestionControlId(question.id)}-help`;
+
+    const error = createElement("p", "field-error");
+    error.id = `${getQuestionControlId(question.id)}-error`;
+    error.setAttribute("role", "alert");
+    error.hidden = true;
+
+    const describedBy = `${help.id} ${error.id}`;
+    let additionalControl;
+    let primaryControl;
+
+    function setAdditionalDisabled(disabled) {
+        if (!additionalControl) return;
+        additionalControl.input.disabled = disabled;
+        additionalControl.wrapper.classList.toggle("is-disabled", disabled);
+        if (disabled) {
+            additionalControl.input.value = "";
+            delete additionalControl.input.dataset.selectedNationality;
+            additionalControl.closeSuggestions();
+        }
+    }
+
+    primaryControl = createNationalityCombobox({
+        controlId: getQuestionControlId(question.id),
+        describedBy,
+        required: Boolean(question.required),
+        onSelect(value) {
+            const additionalValue =
+                additionalControl?.input.dataset.selectedNationality;
+            if (additionalValue === value) {
+                setQuestionError(
+                    container,
+                    "That nationality is already selected.",
+                );
+                return false;
+            }
+            if (exclusiveNationalityValues.has(value)) {
+                setAdditionalDisabled(true);
+            }
+            clearQuestionError(container);
+            return true;
+        },
+    });
+    primaryControl.input.addEventListener("input", () => {
+        setAdditionalDisabled(false);
+    });
+
+    container.append(label, help, primaryControl.wrapper);
+
+    if (question.allowMultiple) {
+        const additionalLabel = createElement(
+            "label",
+            "question-label nationality-additional-label",
+            "Additional nationality (optional)",
+        );
+        additionalLabel.htmlFor = `${getQuestionControlId(question.id)}-additional`;
+        additionalControl = createNationalityCombobox({
+            controlId: `${getQuestionControlId(question.id)}-additional`,
+            describedBy,
+            required: false,
+            onSelect(value) {
+                const primaryValue =
+                    primaryControl.input.dataset.selectedNationality;
+                if (exclusiveNationalityValues.has(value)) {
+                    setQuestionError(
+                        container,
+                        "Choose “Prefer not to answer” or “Stateless” on its own.",
+                    );
+                    return false;
+                }
+                if (primaryValue === value) {
+                    setQuestionError(
+                        container,
+                        "That nationality is already selected.",
+                    );
+                    return false;
+                }
+                if (
+                    exclusiveNationalityValues.has(primaryValue) &&
+                    primaryValue !== value
+                ) {
+                    setQuestionError(
+                        container,
+                        "Choose “Prefer not to answer” or “Stateless” on its own.",
+                    );
+                    return false;
+                }
+                clearQuestionError(container);
+                return true;
+            },
+        });
+        container.append(additionalLabel, additionalControl.wrapper);
+    }
+
+    container.append(error);
+    return container;
+}
+
 function createSingleControlQuestion(question) {
     const container = createElement("div", "form-question");
     container.dataset.demographicQuestion = "";
@@ -526,6 +849,9 @@ function createRangeQuestion(question) {
 
 function renderQuestion(question) {
     if (question.type === "range") return createRangeQuestion(question);
+    if (question.type === "nationality") {
+        return createNationalityQuestion(question);
+    }
     return question.type === "radio" || question.type === "checkbox"
         ? createChoiceQuestion(question)
         : createSingleControlQuestion(question);
@@ -566,6 +892,11 @@ function isConfiguredQuestion(question, questions) {
         question.type === "checkbox" && hasValidOptions &&
         question.options.includes(question.exclusiveOption)
     );
+    const hasValidNationalitySettings = question?.type !== "nationality" || (
+        nationalityOptions.length > 0 &&
+        (question.allowMultiple === undefined ||
+            typeof question.allowMultiple === "boolean")
+    );
     let hasValidCondition = question?.showIf === undefined;
     if (isRecord(question?.showIf)) {
         const parent = questions.find((item) => item?.id === question.showIf.questionId);
@@ -576,7 +907,8 @@ function isConfiguredQuestion(question, questions) {
             question.showIf.values.every((value) => parent.options.includes(value));
     }
     return Boolean(hasValidIdentity && hasValidOptions && hasValidNumberRange &&
-        hasValidRange && hasValidExclusiveOption && hasValidCondition);
+        hasValidRange && hasValidExclusiveOption &&
+        hasValidNationalitySettings && hasValidCondition);
 }
 
 function isRecord(value) {
@@ -1074,6 +1406,76 @@ function initialiseDemographics(config) {
 
 function validateQuestion(question) {
     const questionElement = getQuestionElement(question.id);
+
+    if (question.type === "nationality") {
+        const controls = [
+            ...questionElement.querySelectorAll("[data-nationality-slot]"),
+        ].filter((control) => !control.disabled);
+        const selectedValues = [];
+
+        for (const control of controls) {
+            const selectedValue = control.dataset.selectedNationality ?? "";
+            const rawValue = control.value.trim();
+
+            if (rawValue !== selectedValue) {
+                return {
+                    valid: false,
+                    message: "Select a nationality from the list.",
+                    value: selectedValues.join("; "),
+                };
+            }
+            if (selectedValue && !nationalityOptions.includes(selectedValue)) {
+                return {
+                    valid: false,
+                    message: "Select a nationality from the list.",
+                    value: selectedValues.join("; "),
+                };
+            }
+            if (selectedValue && selectedValues.includes(selectedValue)) {
+                return {
+                    valid: false,
+                    message: "Select each nationality only once.",
+                    value: selectedValues.join("; "),
+                };
+            }
+            if (selectedValue) {
+                selectedValues.push(selectedValue);
+            }
+        }
+
+        if (
+            question.required &&
+            !questionElement.querySelector(
+                '[data-nationality-slot="demographic-nationality"]',
+            )?.dataset.selectedNationality
+        ) {
+            return {
+                valid: false,
+                message: "Select a nationality from the list.",
+                value: selectedValues.join("; "),
+            };
+        }
+
+        if (
+            selectedValues.length > 1 &&
+            selectedValues.some((value) =>
+                exclusiveNationalityValues.has(value),
+            )
+        ) {
+            return {
+                valid: false,
+                message:
+                    "Choose “Prefer not to answer” or “Stateless” on its own.",
+                value: selectedValues.join("; "),
+            };
+        }
+
+        return {
+            valid: true,
+            message: "",
+            value: selectedValues.join("; "),
+        };
+    }
 
     if (question.type === "range") {
         const selected = questionElement.querySelector('input[type="radio"]:checked');
@@ -2705,12 +3107,29 @@ assessmentVideo.addEventListener("error", () => {
 
 async function loadDemographics() {
     try {
-        const response = await fetch("data/pre-questionnaire.json");
-        if (!response.ok) {
+        const [questionnaireResponse, nationalityResponse] = await Promise.all([
+            fetch("data/pre-questionnaire.json"),
+            fetch("data/nationalities.json"),
+        ]);
+        if (!questionnaireResponse.ok || !nationalityResponse.ok) {
             throw new Error("Questionnaire request failed");
         }
 
-        const config = await response.json();
+        const [config, options] = await Promise.all([
+            questionnaireResponse.json(),
+            nationalityResponse.json(),
+        ]);
+        if (
+            !Array.isArray(options) ||
+            !options.length ||
+            !options.every(
+                (option) => typeof option === "string" && option.trim(),
+            ) ||
+            new Set(options).size !== options.length
+        ) {
+            throw new Error("Nationality list is invalid");
+        }
+        nationalityOptions = options;
         initialiseDemographics(config);
     } catch {
         setParticipationUnavailable(
