@@ -88,15 +88,6 @@ const learningModuleTitle = document.querySelector("#learning-module-title");
 const learningModuleContent = document.querySelector(
     "#learning-module-content",
 );
-const learningMedia = document.querySelector("#learning-media");
-const learningVideoSelector = document.querySelector(
-    "#learning-video-selector",
-);
-const learningMediaVideo = document.querySelector("#learning-media-video");
-const learningMediaStatus = document.querySelector("#learning-media-status");
-const learningComparisonNote = document.querySelector(
-    "#learning-comparison-note",
-);
 const learningConcepts = document.querySelector("#learning-concepts");
 const learningContentHeading = document.querySelector(
     "#learning-content-heading",
@@ -184,7 +175,18 @@ const participantSession = {
     },
 };
 
+function clearMediaElement(mediaElement) {
+    mediaElement.pause();
+    mediaElement.removeAttribute("src");
+    mediaElement.load();
+}
+
 function showStage(stageIndex, moveFocus = true) {
+    const previousStage = stages[currentStageIndex];
+    if (previousStage?.assessmentMode) {
+        clearMediaElement(assessmentVideo);
+    }
+
     let stage = stages[stageIndex];
     if (
         stage?.id === "results" &&
@@ -222,8 +224,6 @@ function showStage(stageIndex, moveFocus = true) {
 
     if (stage.id === "learning") {
         renderLearningStage();
-    } else {
-        learningMediaVideo.pause();
     }
 
     if (stage.id === "submission") {
@@ -416,14 +416,23 @@ function createSingleControlQuestion(question) {
     control.id = getQuestionControlId(question.id);
     control.name = getQuestionControlId(question.id);
     control.required = Boolean(question.required);
-    control.setAttribute("aria-describedby", `${control.id}-error`);
 
     const error = createElement("p", "field-error");
     error.id = `${control.id}-error`;
     error.setAttribute("role", "alert");
     error.hidden = true;
 
-    container.append(label, control, error);
+    const describedBy = [];
+    container.append(label);
+    if (question.helpText) {
+        const help = createElement("p", "question-help", question.helpText);
+        help.id = `${control.id}-help`;
+        describedBy.push(help.id);
+        container.append(help);
+    }
+    describedBy.push(error.id);
+    control.setAttribute("aria-describedby", describedBy.join(" "));
+    container.append(control, error);
     return container;
 }
 
@@ -562,14 +571,6 @@ function isNonEmptyString(value) {
     return typeof value === "string" && value.trim().length > 0;
 }
 
-function isLocalMediaSource(value) {
-    return (
-        isNonEmptyString(value) &&
-        !value.trim().startsWith("//") &&
-        !/^[a-z][a-z\d+.-]*:/i.test(value.trim())
-    );
-}
-
 function validateLearningConfig(config) {
     if (!Array.isArray(config)) {
         return {
@@ -612,20 +613,6 @@ function validateLearningConfig(config) {
         };
 
         if (module.type === "content") {
-            const comparisonVideos = module.comparisonVideos;
-            const comparisonVideoKeys = ["real", "fake"];
-            const hasValidVideos =
-                isRecord(comparisonVideos) &&
-                comparisonVideoKeys.every((key) => {
-                    const video = comparisonVideos[key];
-                    return (
-                        isRecord(video) &&
-                        isNonEmptyString(video.label) &&
-                        isLocalMediaSource(video.file)
-                    );
-                }) &&
-                comparisonVideos.real.file.trim() !==
-                    comparisonVideos.fake.file.trim();
             const clueIds = Array.isArray(module.clues)
                 ? module.clues.map((clue) => clue?.id?.trim())
                 : [];
@@ -643,29 +630,17 @@ function validateLearningConfig(config) {
 
             if (
                 !isNonEmptyString(module.introduction) ||
-                !hasValidVideos ||
-                !isNonEmptyString(module.comparisonNote) ||
                 !isNonEmptyString(module.contentHeading) ||
                 !hasValidClues
             ) {
                 return {
                     isValid: false,
                     message:
-                        "Learning content is not validly configured. Content modules need an introduction, two local comparison videos, a comparison note, a heading, and uniquely identified concepts.",
+                        "Learning content is not validly configured. Content modules need an introduction, a heading, and uniquely identified concepts.",
                 };
             }
 
             normalisedModule.introduction = module.introduction.trim();
-            normalisedModule.comparisonVideos = Object.fromEntries(
-                comparisonVideoKeys.map((key) => [
-                    key,
-                    {
-                        label: comparisonVideos[key].label.trim(),
-                        file: comparisonVideos[key].file.trim(),
-                    },
-                ]),
-            );
-            normalisedModule.comparisonNote = module.comparisonNote.trim();
             normalisedModule.contentHeading = module.contentHeading.trim();
             normalisedModule.clues = module.clues.map((clue) => ({
                 id: clue.id.trim(),
@@ -708,18 +683,14 @@ function validateLearningConfig(config) {
                 }) &&
                 new Set(questionIds).size === questionIds.length;
 
-            if (
-                !isNonEmptyString(module.contentHeading) ||
-                !hasValidQuestions
-            ) {
+            if (!hasValidQuestions) {
                 return {
                     isValid: false,
                     message:
-                        "Learning quiz content is not validly configured. Quiz modules need a heading and uniquely identified questions with three options, a matching correct answer, and feedback.",
+                        "Learning quiz content is not validly configured. Quiz modules need uniquely identified questions with three options, a matching correct answer, and feedback.",
                 };
             }
 
-            normalisedModule.contentHeading = module.contentHeading.trim();
             normalisedModule.questions = module.questions.map((question) => ({
                 id: question.id.trim(),
                 question: question.question.trim(),
@@ -893,7 +864,6 @@ function validateVideoConfig(config) {
 
     const ids = new Set();
     const files = new Set();
-    const sets = new Set();
 
     for (const video of config) {
         const file = isRecord(video) ? video.file?.trim() : "";
@@ -922,15 +892,24 @@ function validateVideoConfig(config) {
 
         ids.add(video.id);
         files.add(file);
-        sets.add(video.set);
     }
 
-    if (!sets.has("A") || !sets.has("B")) {
-        return {
-            isValid: false,
-            message:
-                "Video content is not validly configured. Both assessment sets A and B require at least one video.",
-        };
+    for (const assignedSet of ["A", "B"]) {
+        const videosInSet = config.filter((video) => video.set === assignedSet);
+        const realCount = videosInSet.filter(
+            (video) => video.label === "real",
+        ).length;
+        const fakeCount = videosInSet.filter(
+            (video) => video.label === "fake",
+        ).length;
+
+        if (videosInSet.length !== 4 || realCount !== 2 || fakeCount !== 2) {
+            return {
+                isValid: false,
+                message:
+                    "Video content is not validly configured. Assessment sets A and B each require exactly four videos: two real and two fake.",
+            };
+        }
     }
 
     return { isValid: true, message: "" };
@@ -950,20 +929,19 @@ function assignParticipantCondition() {
 }
 
 function selectAssessmentVideosForSet(assignedSet) {
-    const videosInSet = assessmentVideos.filter(
+    const selected = assessmentVideos.filter(
         (video) => video.set === assignedSet,
     );
-    const randomVideo = (label) => {
-        const candidates = videosInSet.filter((video) => video.label === label);
-        return candidates[Math.floor(Math.random() * candidates.length)];
-    };
-    const selected = [randomVideo("real"), randomVideo("fake")];
 
-    if (Math.random() < 0.5) {
-        selected.reverse();
+    for (let index = selected.length - 1; index > 0; index -= 1) {
+        const randomIndex = Math.floor(Math.random() * (index + 1));
+        [selected[index], selected[randomIndex]] = [
+            selected[randomIndex],
+            selected[index],
+        ];
     }
 
-    return selected.filter(Boolean).map((video) => video.id);
+    return selected.map((video) => video.id);
 }
 
 function selectAssessmentVideos() {
@@ -981,9 +959,14 @@ function ensureAssessmentVideoSelection() {
     const selectedIds = participantSession.selectedVideoIds;
     const hasCompleteSelection = ["pre", "post"].every(
         (mode) =>
-            selectedIds[mode].length === 2 &&
+            selectedIds[mode].length === 4 &&
+            new Set(selectedIds[mode]).size === 4 &&
             selectedIds[mode].every((videoId) =>
-                assessmentVideos.some((video) => video.id === videoId),
+                assessmentVideos.some(
+                    (video) =>
+                        video.id === videoId &&
+                        video.set === participantSession.videoSets[mode],
+                ),
             ),
     );
 
@@ -1258,9 +1241,7 @@ function setAssessmentUnavailable(message, isError = false) {
     assessmentSubmitButton.hidden = true;
     assessmentErrorSummary.hidden = true;
     assessmentVideoStatus.hidden = true;
-    assessmentVideo.pause();
-    assessmentVideo.removeAttribute("src");
-    assessmentVideo.load();
+    clearMediaElement(assessmentVideo);
     assessmentConfigStatus.textContent = message;
     assessmentConfigStatus.hidden = false;
     assessmentConfigStatus.classList.toggle("is-error", isError);
@@ -1774,10 +1755,7 @@ function resetExperimentSession() {
         .querySelectorAll("[data-demographic-question]")
         .forEach((question) => clearQuestionError(question));
     assessmentErrorSummary.hidden = true;
-    assessmentVideo.pause();
-    assessmentVideo.removeAttribute("src");
-    assessmentVideo.load();
-    clearLearningMedia();
+    clearMediaElement(assessmentVideo);
     resetSubmissionState();
     clearResultsDisplay();
     showStage(0);
@@ -1951,6 +1929,7 @@ function renderAssessmentStage(mode) {
     const videos = getAssessmentVideos(mode);
     const currentVideo = videos[progress.videoIndex];
 
+    clearMediaElement(assessmentVideo);
     assessmentErrorSummary.hidden = true;
     assessmentSubmitButton.disabled = true;
     assessmentVideoStatus.hidden = true;
@@ -2146,19 +2125,6 @@ function handleAssessmentSubmit(event) {
     renderAssessmentStage(mode);
 }
 
-function clearLearningMedia() {
-    learningMedia.hidden = true;
-    learningMediaStatus.hidden = true;
-    learningVideoSelector.replaceChildren();
-    learningComparisonNote.textContent = "";
-    learningMediaVideo.hidden = true;
-    learningMediaVideo.pause();
-    learningMediaVideo.removeAttribute("src");
-    learningMediaVideo.removeAttribute("aria-label");
-    delete learningMediaVideo.dataset.videoKey;
-    learningMediaVideo.load();
-}
-
 function clearLearningConcepts() {
     learningConcepts.hidden = true;
     learningContentHeading.textContent = "";
@@ -2174,7 +2140,6 @@ function setLearningUnavailable(message, isError = false) {
     learningFeedback.hidden = true;
     learningCheckAnswer.hidden = true;
     learningContinue.disabled = true;
-    clearLearningMedia();
     clearLearningConcepts();
     learningConfigStatus.textContent = message;
     learningConfigStatus.hidden = false;
@@ -2227,65 +2192,15 @@ function getCurrentLearningModuleIndex() {
         : firstIncompleteIndex;
 }
 
-function selectLearningVideo(module, videoKey) {
-    const video = module.comparisonVideos[videoKey];
-
-    if (!video || learningMediaVideo.dataset.videoKey === videoKey) {
-        return;
-    }
-
-    learningMediaVideo.pause();
-    learningMediaStatus.hidden = true;
-    learningMediaVideo.currentTime = 0;
-    learningMediaVideo.src = video.file;
-    learningMediaVideo.dataset.videoKey = videoKey;
-    learningMediaVideo.setAttribute("aria-label", video.label);
-    learningMediaVideo.load();
-
-    learningVideoSelector.querySelectorAll("[data-learning-video]").forEach(
-        (button) => {
-            const isSelected = button.dataset.learningVideo === videoKey;
-            button.classList.toggle("is-selected", isSelected);
-            button.setAttribute("aria-pressed", String(isSelected));
-        },
-    );
-}
-
-function renderLearningMedia(module) {
-    clearLearningMedia();
-
-    if (module.type !== "content") {
-        return;
-    }
-
-    learningMedia.hidden = false;
-    learningMediaVideo.hidden = false;
-    learningComparisonNote.textContent = module.comparisonNote;
-
-    ["real", "fake"].forEach((videoKey) => {
-        const button = createElement(
-            "button",
-            "learning-video-option",
-            module.comparisonVideos[videoKey].label,
-        );
-        button.type = "button";
-        button.dataset.learningVideo = videoKey;
-        button.setAttribute("aria-pressed", "false");
-        learningVideoSelector.append(button);
-    });
-
-    selectLearningVideo(module, "real");
-}
-
 function renderLearningConcepts(module) {
     clearLearningConcepts();
-    learningContentHeading.textContent = module.contentHeading;
-    learningConcepts.hidden = false;
 
     if (module.type !== "content") {
         return;
     }
 
+    learningContentHeading.textContent = module.contentHeading;
+    learningConcepts.hidden = false;
     learningClues.replaceChildren(
         ...module.clues.map((clue, index) => {
             const concept = createElement("article", "learning-clue");
@@ -2463,7 +2378,6 @@ function renderLearningStage(moveFocus = false) {
             createElement("p", "", module.introduction),
         );
     }
-    renderLearningMedia(module);
     renderLearningConcepts(module);
     renderLearningQuiz(module, moduleIndex);
 
@@ -2541,8 +2455,6 @@ function handleLearningContinue() {
     if (!module || !hasAnsweredCurrentQuestion) {
         return;
     }
-
-    learningMediaVideo.pause();
 
     if (
         module.type === "quiz" &&
@@ -2720,31 +2632,6 @@ learningQuizControls.addEventListener("change", (event) => {
         input.removeAttribute("aria-invalid");
     });
     learningCheckAnswer.disabled = false;
-});
-
-learningVideoSelector.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-learning-video]");
-    const module = learningModules[getCurrentLearningModuleIndex()];
-
-    if (!button || module?.type !== "content") {
-        return;
-    }
-
-    selectLearningVideo(module, button.dataset.learningVideo);
-});
-
-learningMediaVideo.addEventListener("error", () => {
-    if (!learningMediaVideo.hidden) {
-        learningMediaStatus.hidden = false;
-    }
-});
-
-learningMediaVideo.addEventListener("loadedmetadata", () => {
-    if (learningMediaVideo.videoWidth && learningMediaVideo.videoHeight) {
-        learningMediaVideo.style.aspectRatio =
-            `${learningMediaVideo.videoWidth} / ${learningMediaVideo.videoHeight}`;
-    }
-    learningMediaStatus.hidden = true;
 });
 
 assessmentVideo.addEventListener("loadedmetadata", () => {

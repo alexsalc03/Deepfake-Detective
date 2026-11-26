@@ -4,17 +4,6 @@
     "type": "content",
     "title": "How people detect deepfakes, and where do they go wrong?",
     "introduction": "Next you will watch more clips of politicians, some authentic and some AI-generated. Here is what research shows about which cues help and which mislead.",
-    "comparisonVideos": {
-      "real": {
-        "label": "Authentic Video",
-        "file": "media/learning-trump_real.mp4"
-      },
-      "fake": {
-        "label": "Deepfake Video",
-        "file": "media/learning-trump_fake.mp4"
-      }
-    },
-    "comparisonNote": "These videos are similar but not identical. A difference between them is not, by itself, evidence of manipulation.",
     "contentHeading": "Part 1: Five things to know",
     "clues": [
       {
@@ -48,7 +37,6 @@
     "id": "check-understanding",
     "type": "quiz",
     "title": "Check your understanding",
-    "contentHeading": "Part 2: Check your understanding",
     "questions": [
       {
         "id": "q1",
@@ -69,26 +57,6 @@
         ],
         "correctOptionId": "c",
         "feedback": "People felt just as confident when they were wrong, so feeling sure doesn't tell you much."
-      },
-      {
-        "id": "q2",
-        "question": "The lips match every word and the emotion fits, but the video is blurry. What's your best call?",
-        "options": [
-          {
-            "id": "a",
-            "text": "Probably fake, because blur is a typical sign of AI editing"
-          },
-          {
-            "id": "b",
-            "text": "Probably real, but still worth checking where it came from"
-          },
-          {
-            "id": "c",
-            "text": "No way to tell, since the blur hides all the useful clues"
-          }
-        ],
-        "correctOptionId": "b",
-        "feedback": "Blur doesn't tell you anything either way. The mouth and the way things are said are much better clues."
       },
       {
         "id": "q3",

@@ -220,7 +220,8 @@ async function run() {
                 participantSession.consentProvided = true;
                 participantSession.demographics = {
                     age: 30,
-                    gender: "Woman",
+                    gender: "Male",
+                    nationality: "Swiss",
                     education_level: "University degree",
                     political_leaning: 4,
                     ai_sentiment: "Unsure",
@@ -229,21 +230,25 @@ async function run() {
                 participantSession.condition = 1;
                 participantSession.videoSets = { pre: "A", post: "B" };
                 participantSession.selectedVideoIds = {
-                    pre: ["t-01", "t-02"],
-                    post: ["t-03", "t-04"]
+                    pre: ["t-01", "t-02", "b-01", "b-02"],
+                    post: ["t-03", "t-04", "b-03", "b-04"]
                 };
                 participantSession.assessmentAnswers = [
                     { stage: "pre", videoId: "t-01", videoPosition: 1, answer: "fake", confidence: 40, clues: ["facial_movements"] },
                     { stage: "pre", videoId: "t-02", videoPosition: 2, answer: "fake", confidence: 50, clues: ["facial_movements"] },
-                    { stage: "post", videoId: "t-03", videoPosition: 1, answer: "fake", confidence: 70, clues: ["facial_movements"] }
+                    { stage: "pre", videoId: "b-01", videoPosition: 3, answer: "fake", confidence: 60, clues: ["facial_movements"] },
+                    { stage: "pre", videoId: "b-02", videoPosition: 4, answer: "fake", confidence: 70, clues: ["facial_movements"] },
+                    { stage: "post", videoId: "t-03", videoPosition: 1, answer: "fake", confidence: 70, clues: ["facial_movements"] },
+                    { stage: "post", videoId: "t-04", videoPosition: 2, answer: "real", confidence: 80, clues: ["facial_movements"] },
+                    { stage: "post", videoId: "b-03", videoPosition: 3, answer: "fake", confidence: 90, clues: ["facial_movements"] }
                 ];
                 participantSession.assessmentProgress = {
-                    pre: { videoIndex: 2 },
-                    post: { videoIndex: 1 }
+                    pre: { videoIndex: 4 },
+                    post: { videoIndex: 3 }
                 };
                 participantSession.learning = {
                     completedModuleIds: ["deepfake-clues", "check-understanding"],
-                    selectedQuizAnswers: { q1: "a", q2: "b", q3: "a", q4: "c" },
+                    selectedQuizAnswers: { q1: "a", q3: "a", q4: "c" },
                     isComplete: true
                 };
                 showStage(
@@ -257,14 +262,14 @@ async function run() {
         await waitFor(
             client,
             "assessmentContentReady && !document.querySelector('#assessment-submit').disabled",
-            "second post-assessment video",
+            "fourth post-assessment video",
         );
         assert.equal(
             await client.evaluate(
                 'document.querySelector("[data-video-position]").textContent.trim()',
             ),
-            "Video 2 of 2",
-            "Round-2 progress shows video 2 of 2",
+            "Video 4 of 4",
+            "Round-2 progress shows video 4 of 4",
         );
         await client.evaluate(`
             (() => {
@@ -284,7 +289,7 @@ async function run() {
         await waitFor(
             client,
             "document.body.dataset.activeStage === 'submission'",
-            "submission stage after the second post-assessment video",
+            "submission stage after the fourth post-assessment video",
         );
 
         const readyState = await client.evaluate(`
@@ -496,7 +501,7 @@ async function run() {
             3,
         );
         assert.equal(failedState.participantId, "PHASE10_TEST_PARTICIPANT");
-        assert.equal(failedState.assessmentAnswerCount, 4);
+        assert.equal(failedState.assessmentAnswerCount, 8);
         assert.equal(failedState.submitText, "Check Submission Again");
         assert.equal(failedState.submitDisabled, false);
         assert.equal(failedState.viewResultsHidden, true);
@@ -509,13 +514,13 @@ async function run() {
         );
         assert.equal(
             JSON.parse(failedState.fetchCalls[0].body).assessments.pre.responses.length,
-            2,
-            "the original POST contains two Round-1 responses",
+            4,
+            "the original POST contains four Round-1 responses",
         );
         assert.equal(
             JSON.parse(failedState.fetchCalls[0].body).assessments.post.responses.length,
-            2,
-            "the original POST contains two Round-2 responses",
+            4,
+            "the original POST contains four Round-2 responses",
         );
 
         const retrySubmitting = await client.evaluate(`
@@ -704,7 +709,7 @@ async function run() {
             fetchCallCount: 1,
             verificationRequestCount: 3,
             participantId: "PHASE10_TEST_PARTICIPANT",
-            assessmentAnswerCount: 4,
+            assessmentAnswerCount: 8,
             submitText: "Check Submission Again",
             viewResultsHidden: true,
             resultsHidden: true,

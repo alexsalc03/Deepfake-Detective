@@ -191,7 +191,8 @@ async function run() {
                 participantSession.consentProvided = true;
                 participantSession.demographics = {
                     age: 25,
-                    gender: "Prefer not to say",
+                    gender: "Female",
+                    nationality: "Prefer not to say",
                     education_level: "University degree",
                     political_leaning: 4,
                     ai_sentiment: "Unsure",
@@ -200,22 +201,26 @@ async function run() {
                 participantSession.condition = 1;
                 participantSession.videoSets = { pre: "A", post: "B" };
                 participantSession.selectedVideoIds = {
-                    pre: ["t-01", "t-02"],
-                    post: ["t-03", "t-04"]
+                    pre: ["t-01", "t-02", "b-01", "b-02"],
+                    post: ["t-03", "t-04", "b-03", "b-04"]
                 };
                 participantSession.assessmentAnswers = [
                     { stage: "pre", videoId: "t-01", videoPosition: 1, answer: "fake", confidence: 50, clues: ["general_impression"] },
                     { stage: "pre", videoId: "t-02", videoPosition: 2, answer: "real", confidence: 50, clues: ["general_impression"] },
+                    { stage: "pre", videoId: "b-01", videoPosition: 3, answer: "fake", confidence: 50, clues: ["general_impression"] },
+                    { stage: "pre", videoId: "b-02", videoPosition: 4, answer: "real", confidence: 50, clues: ["general_impression"] },
                     { stage: "post", videoId: "t-03", videoPosition: 1, answer: "fake", confidence: 50, clues: ["general_impression"] },
-                    { stage: "post", videoId: "t-04", videoPosition: 2, answer: "real", confidence: 50, clues: ["general_impression"] }
+                    { stage: "post", videoId: "t-04", videoPosition: 2, answer: "real", confidence: 50, clues: ["general_impression"] },
+                    { stage: "post", videoId: "b-03", videoPosition: 3, answer: "fake", confidence: 50, clues: ["general_impression"] },
+                    { stage: "post", videoId: "b-04", videoPosition: 4, answer: "real", confidence: 50, clues: ["general_impression"] }
                 ];
                 participantSession.assessmentProgress = {
-                    pre: { videoIndex: 2 },
-                    post: { videoIndex: 2 }
+                    pre: { videoIndex: 4 },
+                    post: { videoIndex: 4 }
                 };
                 participantSession.learning = {
                     completedModuleIds: ["deepfake-clues", "check-understanding"],
-                    selectedQuizAnswers: { q1: "c", q2: "b", q3: "a", q4: "c" },
+                    selectedQuizAnswers: { q1: "c", q3: "a", q4: "c" },
                     isComplete: true
                 };
                 showStage(4, false);

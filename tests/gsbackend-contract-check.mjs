@@ -354,7 +354,8 @@ function currentPayload() {
         participantId: "CONTRACT_TEST",
         demographics: {
             age: 23,
-            gender: "Woman",
+            gender: "Female",
+            nationality: "Swiss and Italian",
             education_level: "University degree",
             political_leaning: 4,
             ai_sentiment: "Equally concerned and excited",
@@ -369,12 +370,16 @@ function currentPayload() {
                 responses: [
                     response("t-01", "fake"),
                     response("t-02", "real"),
+                    response("b-01", "fake"),
+                    response("b-02", "real"),
                 ],
             },
             post: {
                 responses: [
                     response("t-03", "fake"),
                     response("t-04", "real"),
+                    response("b-03", "fake"),
+                    response("b-04", "real"),
                 ],
             },
         },
@@ -383,19 +388,19 @@ function currentPayload() {
                 "deepfake-clues",
                 "check-understanding",
             ],
-            quizAnswers: { q1: "c", q2: "b", q3: "a", q4: "c" },
+            quizAnswers: { q1: "c", q3: "a", q4: "c" },
             isComplete: true,
         },
         performance: {
             pre: {
-                correctClassifications: 2,
-                totalClassifications: 2,
+                correctClassifications: 4,
+                totalClassifications: 4,
                 accuracyPercent: 100,
                 averageConfidencePercent: 75,
             },
             post: {
-                correctClassifications: 2,
-                totalClassifications: 2,
+                correctClassifications: 4,
+                totalClassifications: 4,
                 accuracyPercent: 100,
                 averageConfidencePercent: 75,
             },
@@ -416,6 +421,40 @@ function currentPayload() {
     const firstResult = saveSubmission(currentPayload());
     const duplicateResult = saveSubmission(currentPayload());
 
+    assert.deepEqual(
+        Array.from(PARTICIPANT_HEADERS),
+        [
+            "Submitted At",
+            "Participant ID",
+            "Age",
+            "Gender",
+            "Education Level",
+            "Political Leaning",
+            "AI Sentiment",
+            "Deepfake Exposure Frequency",
+            "Deepfake Exposure Channels JSON",
+            "Political Deepfake Exposure",
+            "Condition",
+            "Pre Video Set",
+            "Post Video Set",
+            "Completed Modules JSON",
+            "Quiz Answers JSON",
+            "Learning Complete",
+            "Pre Correct",
+            "Pre Total",
+            "Pre Accuracy (%)",
+            "Pre Avg Confidence (%)",
+            "Post Correct",
+            "Post Total",
+            "Post Accuracy (%)",
+            "Post Avg Confidence (%)",
+            "Accuracy Difference (pp)",
+            "Demographics JSON",
+            "Payload JSON",
+            "Nationality",
+        ],
+        "Nationality is appended without shifting historical participant columns",
+    );
     assert.deepEqual(
         Array.from(PARTICIPANT_HEADERS.slice(5, 10)),
         [
@@ -439,6 +478,11 @@ function currentPayload() {
         "current demographic answers are written to dedicated columns",
     );
     assert.equal(
+        participants.rows[0][PARTICIPANT_HEADERS.length - 1],
+        "Swiss and Italian",
+        "nationality is written to its appended dedicated column",
+    );
+    assert.equal(
         participants.rows[0].length,
         PARTICIPANT_HEADERS.length,
         "participant values align with their headers",
@@ -450,10 +494,10 @@ function currentPayload() {
     );
     assert.equal(
         participants.rows[0][14],
-        '{"q1":"c","q2":"b","q3":"a","q4":"c"}',
-        "all four quiz answers are serialized into the existing JSON column",
+        '{"q1":"c","q3":"a","q4":"c"}',
+        "all three quiz answers are serialized into the existing JSON column",
     );
-    assert.equal(responses.rows.length, 4, "all four video responses are saved");
+    assert.equal(responses.rows.length, 8, "all eight video responses are saved");
     assert.deepEqual(
         { ...firstResult },
         { success: true, duplicate: false, participantId: "CONTRACT_TEST" },
@@ -465,7 +509,7 @@ function currentPayload() {
         "duplicate participant submissions are acknowledged without extra rows",
     );
     assert.equal(participants.rows.length, 1, "duplicates do not add participant rows");
-    assert.equal(responses.rows.length, 4, "duplicates do not add response rows");
+    assert.equal(responses.rows.length, 8, "duplicates do not add response rows");
     assert.equal(
         lockState.acquisitions,
         2,
@@ -563,7 +607,7 @@ function currentPayload() {
     assert.equal(recoveredResult.duplicate, false);
     assert.equal(
         responses.rows.length,
-        4,
+        8,
         "retry replaces incomplete video rows for the same participant",
     );
     assert.equal(
@@ -605,8 +649,8 @@ function currentPayload() {
         responses.rows.filter(
             (row) => row[0] === interruptedPayload.participantId,
         ).length,
-        4,
-        "a retry after interruption stores four video-response rows",
+        8,
+        "a retry after interruption stores eight video-response rows",
     );
     assert.equal(
         lockState.held,
@@ -639,8 +683,8 @@ function currentPayload() {
     );
     assert.equal(
         state.responses.length,
-        4,
-        "concurrent duplicates create four video-response rows",
+        8,
+        "concurrent duplicates create eight video-response rows",
     );
     assert.equal(
         state.participants[0][1],
@@ -656,7 +700,7 @@ function currentPayload() {
 
     assert.deepEqual(
         responses.rows.map((row) => row[2]),
-        ["t-01", "t-02", "t-03", "t-04"],
+        ["t-01", "t-02", "b-01", "b-02", "t-03", "t-04", "b-03", "b-04"],
         "the manual Apps Script test uses the current video IDs",
     );
     assert.equal(
@@ -666,8 +710,8 @@ function currentPayload() {
     );
     assert.equal(
         participants.rows[0][14],
-        '{"q1":"c","q2":"b","q3":"a","q4":"c"}',
-        "the manual Apps Script test includes all four quiz answers",
+        '{"q1":"c","q3":"a","q4":"c"}',
+        "the manual Apps Script test includes all three quiz answers",
     );
 }
 

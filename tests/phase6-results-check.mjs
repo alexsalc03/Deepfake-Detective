@@ -119,15 +119,31 @@ async function completeDemographics(client) {
             const clickNext = () => document.querySelector("#start-experiment").click();
             document.querySelector("#consent-checkbox").click();
             clickNext();
+            const genderOptions = [...document.querySelector("#demographic-gender").options]
+                .slice(1)
+                .map(({ value }) => value);
+            const require = (condition, message) => { if (!condition) throw new Error(message); };
+            require(
+                JSON.stringify(genderOptions) === JSON.stringify(["Male", "Female"]),
+                "Gender renders only Male and Female"
+            );
+            require(
+                document.querySelector("#demographic-nationality")?.type === "text",
+                "Nationality uses the existing text-question architecture"
+            );
+            require(
+                getQuestionElement("nationality").querySelector(".question-help").textContent.includes("Prefer not to say"),
+                "Nationality provides a Prefer not to say response"
+            );
             setValue("#demographic-age", "25");
-            setValue("#demographic-gender", "Woman", "change");
+            setValue("#demographic-gender", "Female", "change");
+            setValue("#demographic-nationality", "Swiss and Italian");
             setValue("#demographic-education_level", "University degree", "change");
             const scale = document.querySelector('[data-demographic-id="political_leaning"] input[type="range"]');
             scale.value = "4";
             scale.dispatchEvent(new Event("input", { bubbles: true }));
             clickNext();
             document.querySelector('input[name="demographic-ai_sentiment"][value="Unsure"]').click();
-            const require = (condition, message) => { if (!condition) throw new Error(message); };
             require(introStep === 2, "Continue reaches AI questionnaire");
             const configuredQuestions = demographicsConfig.questions;
             const channelConfig = configuredQuestions.find(q => q.id === "deepfake_exposure_channels");
@@ -234,10 +250,10 @@ async function completeLearning(client) {
         "document.querySelector('#learning-module-progress').textContent.includes('Module 2 of 2')",
         "second learning module",
     );
-    for (const [index, answer] of ["a", "b", "a", "c"].entries()) {
+    for (const [index, answer] of ["a", "a", "c"].entries()) {
         await waitFor(
             client,
-            `document.querySelector("#learning-question-progress").textContent.includes("Question ${index + 1} of 4")`,
+            `document.querySelector("#learning-question-progress").textContent.includes("Question ${index + 1} of 3")`,
             `learning question ${index + 1}`,
         );
         await client.evaluate(`
@@ -345,6 +361,23 @@ async function run() {
             "application content",
         );
 
+        assert.deepEqual(
+            await client.evaluate(`
+                (() => ({
+                    missingVideo: validateVideoConfig(
+                        assessmentVideos.filter(({ id }) => id !== "b-01")
+                    ).isValid,
+                    unbalancedLabels: validateVideoConfig(
+                        assessmentVideos.map((video) =>
+                            video.id === "b-02" ? { ...video, label: "fake" } : video
+                        )
+                    ).isValid
+                }))()
+            `),
+            { missingVideo: false, unbalancedLabels: false },
+            "assessment configuration requires four videos and two labels of each kind per set",
+        );
+
         const conditionAssignments = await client.evaluate(`
             (() => {
                 const originalRandom = Math.random;
@@ -418,17 +451,27 @@ async function run() {
             selectionBehavior.first,
             selectionBehavior.second,
         ]) {
-            assert.equal(selection.pre.length, 2, "Round-1 selects two videos");
-            assert.equal(selection.post.length, 2, "Round-2 selects two videos");
+            assert.equal(selection.pre.length, 4, "Round-1 selects four videos");
+            assert.equal(selection.post.length, 4, "Round-2 selects four videos");
             assert.deepEqual(
                 selection.pre.map(({ label }) => label).sort(),
-                ["fake", "real"],
-                "Round-1 selects one authentic and one deepfake video",
+                ["fake", "fake", "real", "real"],
+                "Round-1 selects two authentic and two deepfake videos",
             );
             assert.deepEqual(
                 selection.post.map(({ label }) => label).sort(),
-                ["fake", "real"],
-                "Round-2 selects one authentic and one deepfake video",
+                ["fake", "fake", "real", "real"],
+                "Round-2 selects two authentic and two deepfake videos",
+            );
+            assert.deepEqual(
+                selection.pre.map(({ id }) => id.slice(0, 1)).sort(),
+                ["b", "b", "t", "t"],
+                "Round-1 selects two Biden and two Trump videos",
+            );
+            assert.deepEqual(
+                selection.post.map(({ id }) => id.slice(0, 1)).sort(),
+                ["b", "b", "t", "t"],
+                "Round-2 selects two Biden and two Trump videos",
             );
         }
         assert.notDeepEqual(
@@ -466,8 +509,8 @@ async function run() {
         `);
         assert.deepEqual(
             assignedVideoCounts,
-            { pre: 2, post: 2 },
-            "each assigned assessment round has two selected videos",
+            { pre: 4, post: 4 },
+            "each assigned assessment round has four selected videos",
         );
 
         const submitDisabledBeforeMetadata = await client.evaluate(`
@@ -492,23 +535,44 @@ async function run() {
         const preAnswers = [
             [oppositeLabel(selectedAssessmentVideos.pre[0].label), 40],
             [selectedAssessmentVideos.pre[1].label, 50],
+            [oppositeLabel(selectedAssessmentVideos.pre[2].label), 60],
+            [selectedAssessmentVideos.pre[3].label, 70],
         ];
         const postAnswers = [
-            [selectedAssessmentVideos.post[0].label, 80],
-            [selectedAssessmentVideos.post[1].label, 100],
+            [selectedAssessmentVideos.post[0].label, 70],
+            [selectedAssessmentVideos.post[1].label, 80],
+            [selectedAssessmentVideos.post[2].label, 90],
+            [selectedAssessmentVideos.post[3].label, 100],
         ];
 
         for (const [classification, confidence] of preAnswers) {
             await submitAssessmentAnswer(client, classification, confidence);
         }
         await completeLearning(client);
-        for (const [classification, confidence] of postAnswers) {
+        for (const [index, [classification, confidence]] of postAnswers.entries()) {
+            if (index === postAnswers.length - 1) {
+                await client.evaluate("document.querySelector('#assessment-video').play()");
+            }
             await submitAssessmentAnswer(client, classification, confidence);
         }
         await waitFor(
             client,
             "document.body.dataset.activeStage === 'submission'",
             "submission stage",
+        );
+        assert.deepEqual(
+            await client.evaluate(`
+                (() => {
+                    const video = document.querySelector("#assessment-video");
+                    return {
+                        paused: video.paused,
+                        source: video.getAttribute("src"),
+                        networkEmpty: video.networkState === HTMLMediaElement.NETWORK_EMPTY
+                    };
+                })()
+            `),
+            { paused: true, source: null, networkEmpty: true },
+            "entering Submission stops playback and releases the assessment resource",
         );
 
         const submittingState = await client.evaluate(`
@@ -594,14 +658,14 @@ async function run() {
         `);
         assert.deepEqual(results, {
             heading: "Study complete",
-            preCorrect: "1/2",
+            preCorrect: "2/4",
             preAccuracy: "50%",
-            preConfidence: "45%",
-            postCorrect: "2/2",
+            preConfidence: "55%",
+            postCorrect: "4/4",
             postAccuracy: "100%",
-            postConfidence: "90%",
+            postConfidence: "85%",
             difference: "+50 percentage points",
-            confidenceComparison: "45% → 90%",
+            confidenceComparison: "55% → 85%",
             newParticipantDisabled: null,
             newParticipantInResults: false,
             thankYou: "Thank you for participating. Your Round-1 and Round-2 performance are compared below.",
@@ -613,6 +677,12 @@ async function run() {
         const payload = await client.evaluate("prepareSubmissionPayload()");
         assert.equal(payload.participantId.length > 0, true);
         assert.equal(payload.demographics.age, 25);
+        assert.equal(payload.demographics.gender, "Female");
+        assert.equal(payload.demographics.nationality, "Swiss and Italian");
+        assert.equal(payload.demographics.education_level, "University degree");
+        assert.equal(payload.demographics.political_leaning, 4);
+        assert.equal(payload.demographics.ai_sentiment, "Unsure");
+        assert.equal(payload.demographics.deepfake_exposure_frequency, "Never");
         assert.equal(payload.condition, 1);
         assert.deepEqual(payload.videoSets, { pre: "A", post: "B" });
         assert.deepEqual(payload.assessments.pre.responses[0], {
@@ -626,7 +696,7 @@ async function run() {
             videoId: selectedAssessmentVideos.post[0].id,
             correctLabel: selectedAssessmentVideos.post[0].label,
             classification: selectedAssessmentVideos.post[0].label,
-            confidence: 80,
+            confidence: 70,
             selectedClues: ["facial_movements"],
         });
         assert.deepEqual(
@@ -639,45 +709,45 @@ async function run() {
         );
         assert.equal(
             payload.assessments.pre.responses.length,
-            2,
-            "the pre-assessment payload contains two responses",
+            4,
+            "the pre-assessment payload contains four responses",
         );
         assert.equal(
             payload.assessments.post.responses.length,
-            2,
-            "the post-assessment payload contains two responses",
+            4,
+            "the post-assessment payload contains four responses",
         );
         assert.equal(
             payload.assessments.pre.responses.length +
                 payload.assessments.post.responses.length,
-            4,
-            "the participant payload contains four video responses",
+            8,
+            "the participant payload contains eight video responses",
         );
         assert.equal(
             new Set([
                 ...payload.assessments.pre.responses.map(({ videoId }) => videoId),
                 ...payload.assessments.post.responses.map(({ videoId }) => videoId),
             ]).size,
-            4,
+            8,
             "no assessment video repeats within a participant session",
         );
         assert.deepEqual(payload.learning, {
             completedModuleIds: ["deepfake-clues", "check-understanding"],
-            quizAnswers: { q1: "a", q2: "b", q3: "a", q4: "c" },
+            quizAnswers: { q1: "a", q3: "a", q4: "c" },
             isComplete: true,
         });
         assert.deepEqual(payload.performance, {
             pre: {
-                correctClassifications: 1,
-                totalClassifications: 2,
+                correctClassifications: 2,
+                totalClassifications: 4,
                 accuracyPercent: 50,
-                averageConfidencePercent: 45,
+                averageConfidencePercent: 55,
             },
             post: {
-                correctClassifications: 2,
-                totalClassifications: 2,
+                correctClassifications: 4,
+                totalClassifications: 4,
                 accuracyPercent: 100,
-                averageConfidencePercent: 90,
+                averageConfidencePercent: 85,
             },
             accuracyDifferencePercentagePoints: 50,
         });

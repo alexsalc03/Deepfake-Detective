@@ -398,7 +398,8 @@ async function run() {
                 participantSession.consentProvided = true;
                 participantSession.demographics = {
                     age: 30,
-                    gender: "Woman",
+                    gender: "Female",
+                    nationality: "Swiss",
                     education_level: "University degree",
                     political_leaning: 4,
                     ai_sentiment: "Unsure",
@@ -407,22 +408,26 @@ async function run() {
                 participantSession.condition = 1;
                 participantSession.videoSets = { pre: "A", post: "B" };
                 participantSession.selectedVideoIds = {
-                    pre: ["t-01", "t-02"],
-                    post: ["t-03", "t-04"]
+                    pre: ["t-01", "t-02", "b-01", "b-02"],
+                    post: ["t-03", "t-04", "b-03", "b-04"]
                 };
                 participantSession.assessmentAnswers = [
                     { stage: "pre", videoId: "t-01", videoPosition: 1, answer: "fake", confidence: 40, clues: ["facial_movements"] },
                     { stage: "pre", videoId: "t-02", videoPosition: 2, answer: "real", confidence: 50, clues: ["facial_movements"] },
+                    { stage: "pre", videoId: "b-01", videoPosition: 3, answer: "fake", confidence: 60, clues: ["facial_movements"] },
+                    { stage: "pre", videoId: "b-02", videoPosition: 4, answer: "real", confidence: 70, clues: ["facial_movements"] },
                     { stage: "post", videoId: "t-03", videoPosition: 1, answer: "fake", confidence: 70, clues: ["facial_movements"] },
-                    { stage: "post", videoId: "t-04", videoPosition: 2, answer: "real", confidence: 80, clues: ["facial_movements"] }
+                    { stage: "post", videoId: "t-04", videoPosition: 2, answer: "real", confidence: 80, clues: ["facial_movements"] },
+                    { stage: "post", videoId: "b-03", videoPosition: 3, answer: "fake", confidence: 90, clues: ["facial_movements"] },
+                    { stage: "post", videoId: "b-04", videoPosition: 4, answer: "real", confidence: 100, clues: ["facial_movements"] }
                 ];
                 participantSession.assessmentProgress = {
-                    pre: { videoIndex: 2 },
-                    post: { videoIndex: 2 }
+                    pre: { videoIndex: 4 },
+                    post: { videoIndex: 4 }
                 };
                 participantSession.learning = {
                     completedModuleIds: ["deepfake-clues", "check-understanding"],
-                    selectedQuizAnswers: { q1: "c", q2: "b", q3: "a", q4: "c" },
+                    selectedQuizAnswers: { q1: "c", q3: "a", q4: "c" },
                     isComplete: true
                 };
                 window.__jsonpSubmission = {
@@ -479,7 +484,7 @@ async function run() {
                 viewResultsHidden: true,
                 resultsHidden: true,
                 participantId,
-                answerCount: 4,
+                answerCount: 8,
             },
             "unconfirmed verification keeps results locked after one POST",
         );

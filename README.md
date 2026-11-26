@@ -36,7 +36,7 @@ deepfake-detective/
 │   ├── videos.json
 │   └── lessons.json
 ├── media/
-│   └── *.mp4 (8 assessment videos and 2 learning videos)
+│   └── *.mp4 (8 assessment videos and 2 retained legacy Learning videos)
 ├── gsscript/
 │   └── gsbackend.gs
 ├── tests/
@@ -54,7 +54,7 @@ deepfake-detective/
 - `css/` contains the application styles.
 - `js/` contains the vanilla JavaScript application code.
 - `data/` contains JSON content loaded by the application.
-- `media/` contains separate local videos for the assessments and Learning.
+- `media/` contains the assessment videos plus two unused legacy Learning videos.
 - `tests/` contains browser-level checks that use local Chrome.
 
 ## Run locally
@@ -94,22 +94,21 @@ conditions:
 - Condition 1: Round-1 uses set A; Round-2 uses set B
 - Condition 2: Round-1 uses set B; Round-2 uses set A
 
-Each round randomly selects exactly one authentic and one deepfake video from
-its assigned set. The selection is stored in the participant session, remains
-stable for the whole experiment, and does not repeat a video across the two
-rounds. Across participants, all eight configured assessment videos remain
-eligible.
+Each round uses all four videos from its assigned set: two authentic and two
+deepfake videos, with two featuring Donald Trump and two featuring Joe Biden.
+Their order is shuffled once, stored in the participant session, and remains
+stable without repeats.
 
 Each assessment shows one configured video at a time. A submitted answer is
 stored in the in-memory participant session and the assessment advances only
 after the browser has loaded the current video's metadata and all required
 responses are valid. A video loading error keeps submission disabled. The
-progress label shows Video 1 of 2 and Video 2 of 2. The second Round-1 video
-moves to the Learning stage. Learning first presents the configured
-authentic/deepfake comparison and five concepts, then shows four quiz questions
-one at a time. Each answer must be checked before the next question is
-available. After all four answers are saved, the final module opens Round-2;
-the second Round-2 video moves to Submission.
+progress label runs from Video 1 of 4 through Video 4 of 4. Leaving a video
+pauses playback and releases its media source. The fourth Round-1 video moves
+to Learning. Learning presents the approved introduction and five concepts in
+a vertical text-only layout, followed by three quiz questions shown one at a
+time. Each answer must be checked before the next question is available. After
+all three answers are saved, Round-2 opens; its fourth video moves to Submission.
 
 Participant state is held in the existing `participantSession` object in
 `js/app.js`. It includes the participant ID, consent and demographic responses,
@@ -121,7 +120,7 @@ when the participant selects Submit Results.
 
 The Submission stage prepares a JSON-serializable payload with the participant,
 demographic, condition, assessment, learning, and calculated performance data.
-Each round contributes two responses, for four assessment responses per
+Each round contributes four responses, for eight assessment responses per
 participant. Submit Results sends that payload once to the configured Google
 Apps Script Web App and then verifies the participant ID through its JSONP GET
 endpoint. Verification retries do not resend the POST. If verification remains
@@ -146,8 +145,9 @@ and does not provide a New Participant button.
 The assessment uses eight local MP4 videos referenced from the configured
 research dataset. Their metadata, set assignment, and `real`/`fake` labels live
 in `data/videos.json` and must be reviewed by the research team before the data
-is used for research conclusions. The two Learning videos are configured only
-in `data/lessons.json` and remain separate from the assessment sets.
+is used for research conclusions. Learning no longer uses a video player. The
+two `media/learning-trump_*.mp4` files are retained as unused assets and may be
+removed later after repository review.
 
 The application shows an unavailable/configuration message instead of
 fabricating content when assessment or lesson files are empty or invalid.
@@ -170,6 +170,11 @@ fabricating content when assessment or lesson files are empty or invalid.
     ]
 }
 ```
+
+The current demographic section includes age, gender (Male/Female), a required
+free-text nationality field that accepts multiple nationalities or “Prefer not
+to say”, and education. Questionnaire responses are serialized by their stable
+IDs, including `demographics.nationality`.
 
 `options` is required for `select`, `radio`, and `checkbox` questions and is
 omitted for `text` and `number` questions. An empty consent statement or an
@@ -203,11 +208,6 @@ current configuration uses a `content` module followed by a `quiz` module.
         "type": "content",
         "title": "Content module title",
         "introduction": "Approved introduction.",
-        "comparisonVideos": {
-            "real": { "label": "Authentic Video", "file": "media/real.mp4" },
-            "fake": { "label": "Deepfake Video", "file": "media/fake.mp4" }
-        },
-        "comparisonNote": "Approved comparison note.",
         "contentHeading": "Section heading",
         "clues": [
             { "id": "clue_id", "title": "Concept title", "text": "Approved explanation." }
@@ -217,7 +217,6 @@ current configuration uses a `content` module followed by a `quiz` module.
         "id": "quiz_module_id",
         "type": "quiz",
         "title": "Quiz module title",
-        "contentHeading": "Section heading",
         "questions": [
             {
                 "id": "q1",
@@ -236,21 +235,21 @@ current configuration uses a `content` module followed by a `quiz` module.
 ```
 
 - Module, concept, question, and option IDs must be unique within their scope.
-- A content module requires both local comparison video paths, a comparison
-  note, and at least one concept. Only the selected video is loaded.
+- A content module requires an introduction, section heading, and at least one
+  concept. Learning modules contain no video configuration or player.
 - Each quiz question requires exactly three options. `correctOptionId` must
   match one option ID, and feedback is shown only after submission.
 - Quiz answers are stored by question ID in `learning.quizAnswers`; the current
-  module records all four answers as `q1` through `q4`.
+  module records the three retained IDs `q1`, `q3`, and `q4`.
 - An empty or invalid module list shows a configuration message and leaves
   Learning incomplete and blocked.
 
 ### Video configuration
 
-`data/videos.json` is an array of eight available assessment videos. IDs and
-local file paths must be unique across the file so a video cannot appear in
-both rounds. For each participant, the application selects one `real` and one
-`fake` video from each assigned set.
+`data/videos.json` is an array of eight assessment videos. IDs and local file
+paths must be unique across the file so a video cannot appear in both rounds.
+For each participant, the application shuffles and uses all four videos from
+each assigned set.
 
 ```json
 [
@@ -267,8 +266,8 @@ both rounds. For each participant, the application selects one `real` and one
 - `file` must be a local path, not an external URL.
 - `label` must be `real` or `fake`.
 - `set` must be `A` or `B`. The current study design uses four available
-  videos in each set, balanced between two `real` and two `fake` labels. Only
-  two videos from each set are selected for a participant.
+  videos in each set, balanced between two `real` and two `fake` labels and
+  two Trump and two Biden videos. All four are shown to the participant.
 - `source` and `label` are available in the configuration but are not displayed
   during the assessment.
 - `source` may be an empty string only while temporary test content is in use.
@@ -342,9 +341,20 @@ node tests/gsbackend-contract-check.mjs
 ```
 
 The scripts start temporary local server and Chrome processes. Together they
-verify two-video rounds, stable balanced video selection, learning preservation,
-result calculations, submission verification retries, idempotent backend
-writes, responsive widths, and browser console errors.
+verify four-video rounds, stable balanced video selection, media cleanup,
+three-question Learning completion, result calculations, submission
+verification retries, idempotent backend writes, responsive widths, and
+browser console errors.
+
+## Google Sheets migration
+
+The Apps Script participant mapping appends `Nationality` after the existing
+`Payload JSON` column so historical columns do not move. If the Participants
+sheet already contains submissions, manually set cell `AB1` to `Nationality`;
+leave existing rows unchanged. The defensive `setup()` function will not alter
+headers when data rows exist and will throw until this header is added. Do not
+run `setup()` for this migration. After reviewing the local change, deploy a new
+Apps Script Web App version so future submissions use the appended column.
 
 The live submission check is opt-in because it sends one synthetic result to
 the configured Google Sheet:

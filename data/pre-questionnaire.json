@@ -16,11 +16,17 @@
             "type": "select",
             "required": true,
             "options": [
-                "Woman",
-                "Man",
-                "Non-binary",
-                "Prefer not to say"
+                "Male",
+                "Female"
             ],
+            "section": "demographics"
+        },
+        {
+            "id": "nationality",
+            "label": "What is your nationality?",
+            "helpText": "Enter more than one nationality if applicable, or enter “Prefer not to say”.",
+            "type": "text",
+            "required": true,
             "section": "demographics"
         },
         {

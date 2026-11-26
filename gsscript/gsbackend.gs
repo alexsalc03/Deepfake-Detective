@@ -30,7 +30,8 @@ const PARTICIPANT_HEADERS = [
   "Post Avg Confidence (%)",
   "Accuracy Difference (pp)",
   "Demographics JSON",
-  "Payload JSON"
+  "Payload JSON",
+  "Nationality"
 ];
 
 const RESPONSE_HEADERS = [
@@ -209,7 +210,8 @@ function saveSubmission(payload) {
     post.averageConfidencePercent,
     performance.accuracyDifferencePercentagePoints,
     JSON.stringify(demographics),
-    JSON.stringify(payload)
+    JSON.stringify(payload),
+    safeCell(demographics.nationality)
   ].map(safeCell);
 
   // Prepare one row for every assessed video.
@@ -341,7 +343,8 @@ function testSubmission() {
 
     demographics: {
       age: 23,
-      gender: "Woman",
+      gender: "Female",
+      nationality: "Swiss and Italian",
       education_level: "University degree",
       political_leaning: 4,
       ai_sentiment: "Equally concerned and excited",
@@ -372,6 +375,20 @@ function testSubmission() {
             classification: "real",
             confidence: 75,
             selectedClues: ["general_impression"]
+          },
+          {
+            videoId: "b-01",
+            correctLabel: "fake",
+            classification: "fake",
+            confidence: 75,
+            selectedClues: ["general_impression"]
+          },
+          {
+            videoId: "b-02",
+            correctLabel: "real",
+            classification: "real",
+            confidence: 75,
+            selectedClues: ["general_impression"]
           }
         ]
       },
@@ -390,6 +407,20 @@ function testSubmission() {
             classification: "real",
             confidence: 75,
             selectedClues: ["general_impression"]
+          },
+          {
+            videoId: "b-03",
+            correctLabel: "fake",
+            classification: "fake",
+            confidence: 75,
+            selectedClues: ["general_impression"]
+          },
+          {
+            videoId: "b-04",
+            correctLabel: "real",
+            classification: "real",
+            confidence: 75,
+            selectedClues: ["general_impression"]
           }
         ]
       }
@@ -402,7 +433,6 @@ function testSubmission() {
       ],
       quizAnswers: {
         q1: "c",
-        q2: "b",
         q3: "a",
         q4: "c"
       },
@@ -411,14 +441,14 @@ function testSubmission() {
 
     performance: {
       pre: {
-        correctClassifications: 2,
-        totalClassifications: 2,
+        correctClassifications: 4,
+        totalClassifications: 4,
         accuracyPercent: 100,
         averageConfidencePercent: 75
       },
       post: {
-        correctClassifications: 2,
-        totalClassifications: 2,
+        correctClassifications: 4,
+        totalClassifications: 4,
         accuracyPercent: 100,
         averageConfidencePercent: 75
       },

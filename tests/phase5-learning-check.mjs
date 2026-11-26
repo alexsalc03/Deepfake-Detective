@@ -140,8 +140,22 @@ async function completeDemographics(client) {
             const clickNext = () => document.querySelector("#start-experiment").click();
             document.querySelector("#consent-checkbox").click();
             clickNext();
+            const require = (condition, message) => { if (!condition) throw new Error(message); };
+            require(
+                JSON.stringify([...document.querySelector("#demographic-gender").options].slice(1).map(({ value }) => value)) ===
+                    JSON.stringify(["Male", "Female"]),
+                "Gender renders only Male and Female"
+            );
+            const nationality = document.querySelector("#demographic-nationality");
+            require(nationality?.type === "text", "Nationality renders as a text field");
+            require(
+                getQuestionElement("nationality").querySelector(".question-help").textContent.includes("more than one") &&
+                    getQuestionElement("nationality").querySelector(".question-help").textContent.includes("Prefer not to say"),
+                "Nationality explains multiple answers and the opt-out response"
+            );
             setValue("#demographic-age", "25");
-            setValue("#demographic-gender", "Woman", "change");
+            setValue("#demographic-gender", "Male", "change");
+            setValue("#demographic-nationality", "Swiss, Italian");
             setValue("#demographic-education_level", "University degree", "change");
             const scale = document.querySelector('[data-demographic-id="political_leaning"] input[type="range"]');
             scale.value = "4";
@@ -159,6 +173,21 @@ async function completeDemographics(client) {
         "document.body.dataset.activeStage === 'pre-assessment'",
         "pre-assessment stage",
     );
+    assert.deepEqual(
+        await client.evaluate(`({
+            age: participantSession.demographics.age,
+            gender: participantSession.demographics.gender,
+            nationality: participantSession.demographics.nationality,
+            education: participantSession.demographics.education_level
+        })`),
+        {
+            age: 25,
+            gender: "Male",
+            nationality: "Swiss, Italian",
+            education: "University degree",
+        },
+        "the demographic answers are stored without affecting neighboring fields",
+    );
 }
 
 async function completePreAssessment(client) {
@@ -172,11 +201,16 @@ async function completePreAssessment(client) {
         'getAssessmentVideos("pre").map(({ id, label }) => ({ id, label }))',
     );
     const videoCount = selectedVideos.length;
-    assert.equal(videoCount, 2, "the assigned pre-assessment round has two videos");
+    assert.equal(videoCount, 4, "the assigned pre-assessment round has four videos");
     assert.deepEqual(
         selectedVideos.map(({ label }) => label).sort(),
-        ["fake", "real"],
-        "the pre-assessment round has one authentic and one deepfake video",
+        ["fake", "fake", "real", "real"],
+        "the pre-assessment round has two authentic and two deepfake videos",
+    );
+    assert.deepEqual(
+        selectedVideos.map(({ id }) => id.slice(0, 1)).sort(),
+        ["b", "b", "t", "t"],
+        "the pre-assessment round has two Biden and two Trump videos",
     );
 
     for (let index = 0; index < videoCount; index += 1) {
@@ -189,8 +223,8 @@ async function completePreAssessment(client) {
             await client.evaluate(
                 'document.querySelector("[data-video-position]").textContent.trim()',
             ),
-            `Video ${index + 1} of 2`,
-            `assessment progress shows video ${index + 1} of 2`,
+            `Video ${index + 1} of 4`,
+            `assessment progress shows video ${index + 1} of 4`,
         );
         await waitFor(
             client,
@@ -198,8 +232,11 @@ async function completePreAssessment(client) {
             `assessment submission cooldown ${index + 1}`,
         );
 
-        await client.evaluate(`
-            (() => {
+        const mediaBeforeAdvance = await client.evaluate(`
+            (async () => {
+                const video = document.querySelector("#assessment-video");
+                await video.play();
+                const state = { paused: video.paused, source: video.currentSrc };
                 document.querySelector(
                     '#assessment-questions input[name="assessment-classification"]'
                 ).click();
@@ -211,15 +248,35 @@ async function completePreAssessment(client) {
                     '#assessment-questions input[name="assessment-clues"]'
                 ).click();
                 document.querySelector("#assessment-submit").click();
-                return true;
+                return state;
             })()
         `);
+        assert.equal(mediaBeforeAdvance.paused, false, "the assessment video is playing before advancing");
 
         if (index < videoCount - 1) {
             await waitFor(
                 client,
                 `participantSession.assessmentProgress.pre.videoIndex === ${index + 1}`,
                 `pre-assessment video ${index + 2}`,
+            );
+            await waitFor(
+                client,
+                `document.querySelector("#assessment-video").readyState >= 1`,
+                `pre-assessment video ${index + 2} metadata`,
+                15000,
+            );
+            assert.deepEqual(
+                await client.evaluate(`
+                    (() => {
+                        const video = document.querySelector("#assessment-video");
+                        return {
+                            paused: video.paused,
+                            sourceChanged: video.currentSrc !== ${JSON.stringify(mediaBeforeAdvance.source)}
+                        };
+                    })()
+                `),
+                { paused: true, sourceChanged: true },
+                "advancing stops the prior video before loading the next one",
             );
         }
     }
@@ -228,6 +285,20 @@ async function completePreAssessment(client) {
         client,
         "document.body.dataset.activeStage === 'learning'",
         "Learning stage after the pre-assessment",
+    );
+    assert.deepEqual(
+        await client.evaluate(`
+            (() => {
+                const video = document.querySelector("#assessment-video");
+                return {
+                    paused: video.paused,
+                    source: video.getAttribute("src"),
+                    networkEmpty: video.networkState === HTMLMediaElement.NETWORK_EMPTY
+                };
+            })()
+        `),
+        { paused: true, source: null, networkEmpty: true },
+        "entering Learning stops playback and releases the assessment resource",
     );
 }
 
@@ -345,16 +416,9 @@ async function run() {
                 clueTitles: [...document.querySelectorAll(".learning-clue-title")].map(
                     (element) => element.textContent.trim()
                 ),
-                note: document.querySelector("#learning-comparison-note")?.textContent.trim() ?? "",
-                playerCount: document.querySelectorAll("#learning-media video").length,
-                source: document.querySelector("#learning-media-video").getAttribute("src"),
-                controls: document.querySelector("#learning-media-video").controls,
-                autoplay: document.querySelector("#learning-media-video").autoplay,
-                preload: document.querySelector("#learning-media-video").preload,
-                buttonLabels: [...document.querySelectorAll("[data-learning-video]")].map(
-                    (button) => button.textContent.trim()
-                ),
-                selectedVideo: document.querySelector("[data-learning-video].is-selected")?.dataset.learningVideo ?? null,
+                mediaElementCount: document.querySelectorAll(
+                    "#learning-media, #learning-media-video, #learning-video-selector, [data-learning-video]"
+                ).length,
                 quizHidden: document.querySelector("#learning-quiz").hidden,
                 continueDisabled: document.querySelector("#learning-continue").disabled
             }))()
@@ -374,24 +438,10 @@ async function run() {
                 "Disregard image quality",
                 "Verify the source",
             ],
-            note:
-                "These videos are similar but not identical. A difference between them is not, by itself, evidence of manipulation.",
-            playerCount: 1,
-            source: "media/learning-trump_real.mp4",
-            controls: true,
-            autoplay: false,
-            preload: "metadata",
-            buttonLabels: ["Authentic Video", "Deepfake Video"],
-            selectedVideo: "real",
+            mediaElementCount: 0,
             quizHidden: true,
             continueDisabled: false,
         });
-        await waitFor(
-            client,
-            "document.querySelector('#learning-media-video').readyState >= 1",
-            "authentic learning video metadata",
-            15000,
-        );
         assert.equal(
             await client.evaluate(
                 "document.querySelector('#learning-screen [data-next-stage]') === null",
@@ -420,67 +470,8 @@ async function run() {
         );
         await captureViewport(client, "/tmp/phase5-learning-mobile.png");
 
-        await client.evaluate(`
-            (async () => {
-                const video = document.querySelector("#learning-media-video");
-                await video.play();
-                document.querySelector('[data-learning-video="fake"]').click();
-                return true;
-            })()
-        `);
-        await waitFor(
-            client,
-            `document.querySelector("#learning-media-video").readyState >= 1 &&
-             document.querySelector("#learning-media-video").getAttribute("src") === "media/learning-trump_fake.mp4"`,
-            "deepfake learning video metadata",
-            15000,
-        );
-        assert.deepEqual(
-            await client.evaluate(`
-                (() => {
-                    const video = document.querySelector("#learning-media-video");
-                    return {
-                        paused: video.paused,
-                        currentTime: video.currentTime,
-                        selected: document.querySelector("[data-learning-video].is-selected").dataset.learningVideo,
-                        pressed: document.querySelector('[data-learning-video="fake"]').getAttribute("aria-pressed")
-                    };
-                })()
-            `),
-            { paused: true, currentTime: 0, selected: "fake", pressed: "true" },
-            "switching pauses, resets, and selects the configured video",
-        );
         await client.evaluate(
-            `document.querySelector('[data-learning-video="real"]').click(); true`,
-        );
-        await waitFor(
-            client,
-            `document.querySelector("#learning-media-video").readyState >= 1 &&
-             document.querySelector("#learning-media-video").getAttribute("src") === "media/learning-trump_real.mp4"`,
-            "return to authentic learning video",
-            15000,
-        );
-        await client.evaluate(`
-            (() => {
-                const video = document.querySelector("#learning-media-video");
-                video.dispatchEvent(new Event("error"));
-                return true;
-            })()
-        `);
-        assert.equal(
-            await client.evaluate(
-                "!document.querySelector('#learning-media-status').hidden",
-            ),
-            true,
-            "learning video errors are communicated",
-        );
-
-        await client.evaluate(
-            `(() => {
-                const video = document.querySelector("#learning-media-video");
-                document.querySelector("#learning-continue").click();
-                return video.paused;
-            })()`,
+            `document.querySelector("#learning-continue").click(); true`,
         );
         await waitFor(
             client,
@@ -492,6 +483,33 @@ async function run() {
                 "document.querySelector('#learning-module-title').textContent",
             ),
             "Check your understanding",
+        );
+        assert.deepEqual(
+            await client.evaluate(`
+                (() => ({
+                    matchingVisibleHeadings: [
+                        document.querySelector("#learning-module-title"),
+                        document.querySelector("#learning-content-heading")
+                    ].filter((heading) =>
+                        heading && !heading.closest("[hidden]") &&
+                        heading.textContent.toLowerCase().includes("check your understanding")
+                    ).length,
+                    questionIds: learningModules
+                        .find(({ type }) => type === "quiz")
+                        .questions.map(({ id }) => id),
+                    removedQuestionPresent: learningModules.some((module) =>
+                        module.questions?.some(({ question }) =>
+                            question === "The lips match every word and the emotion fits, but the video is blurry. What's your best call?"
+                        )
+                    )
+                }))()
+            `),
+            {
+                matchingVisibleHeadings: 1,
+                questionIds: ["q1", "q3", "q4"],
+                removedQuestionPresent: false,
+            },
+            "the quiz keeps one heading and the three retained question IDs",
         );
         assert.equal(
             await client.evaluate(
@@ -531,7 +549,7 @@ async function run() {
                 }))()
             `),
             {
-                progress: "Question 1 of 4",
+                progress: "Question 1 of 3",
                 question: "Which of these best describes the mistakes people made in the study?",
                 options: 3,
                 feedbackHidden: true,
@@ -541,15 +559,15 @@ async function run() {
             "the first quiz question starts unanswered and cannot be skipped",
         );
 
-        const quizSelections = ["a", "b", "a", "c"];
+        const quizQuestionIds = ["q1", "q3", "q4"];
+        const quizSelections = ["a", "a", "c"];
         const expectedFeedback = [
             "People felt just as confident when they were wrong, so feeling sure doesn't tell you much.",
-            "Blur doesn't tell you anything either way. The mouth and the way things are said are much better clues.",
             "AI can copy a voice almost perfectly, so a voice that sounds right doesn't prove much on its own.",
             "Judging by quality was right only about half the time, no better than guessing.",
         ];
 
-        for (let questionIndex = 0; questionIndex < 4; questionIndex += 1) {
+        for (let questionIndex = 0; questionIndex < quizQuestionIds.length; questionIndex += 1) {
             assert.equal(
                 await client.evaluate(
                     "document.querySelectorAll('#learning-quiz input[name=\"learning-quiz-answer\"]').length",
@@ -595,7 +613,7 @@ async function run() {
                         locked: [...document.querySelectorAll('#learning-quiz input[name="learning-quiz-answer"]')].every(
                             (input) => input.disabled
                         ),
-                        saved: participantSession.learning.selectedQuizAnswers.q${questionIndex + 1},
+                        saved: participantSession.learning.selectedQuizAnswers[${JSON.stringify(quizQuestionIds[questionIndex])}],
                         continueDisabled: document.querySelector("#learning-continue").disabled
                     }))()
                 `),
@@ -606,15 +624,15 @@ async function run() {
                     saved: quizSelections[questionIndex],
                     continueDisabled: false,
                 },
-                `question ${questionIndex + 1} is saved, locked, and explained`,
+                `question ${questionIndex + 1} is saved under ${quizQuestionIds[questionIndex]}, locked, and explained`,
             );
             await client.evaluate(
                 "document.querySelector('#learning-continue').click(); true",
             );
-            if (questionIndex < 3) {
+            if (questionIndex < quizQuestionIds.length - 1) {
                 await waitFor(
                     client,
-                    `document.querySelector("#learning-question-progress").textContent.includes("Question ${questionIndex + 2} of 4")`,
+                    `document.querySelector("#learning-question-progress").textContent.includes("Question ${questionIndex + 2} of 3")`,
                     `question ${questionIndex + 2}`,
                 );
             }
@@ -632,13 +650,13 @@ async function run() {
         );
         assert.equal(
             await client.evaluate(
-                "Object.keys(participantSession.learning.selectedQuizAnswers).length === 4",
+                "Object.keys(participantSession.learning.selectedQuizAnswers).length === 3",
             ),
             true,
         );
         assert.equal(
             await client.evaluate(
-                `JSON.stringify(participantSession.learning.selectedQuizAnswers) === JSON.stringify({ q1: "a", q2: "b", q3: "a", q4: "c" })`,
+                `JSON.stringify(participantSession.learning.selectedQuizAnswers) === JSON.stringify({ q1: "a", q3: "a", q4: "c" })`,
             ),
             true,
             "the selected quiz answer is recorded",
