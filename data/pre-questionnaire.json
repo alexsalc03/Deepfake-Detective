@@ -6,7 +6,7 @@
             "label": "Age",
             "type": "number",
             "required": true,
-            "min": 15,
+            "min": 18,
             "max": 100,
             "section": "demographics"
         },

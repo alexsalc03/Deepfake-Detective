@@ -139,6 +139,7 @@ async function completeDemographics(client) {
 
             const clickNext = () => document.querySelector("#start-experiment").click();
             document.querySelector("#consent-checkbox").click();
+            document.querySelector("#age-confirmation-checkbox").click();
             clickNext();
             const require = (condition, message) => { if (!condition) throw new Error(message); };
             require(

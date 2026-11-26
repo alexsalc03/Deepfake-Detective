@@ -134,8 +134,22 @@
                                     >
                                     <span>I understand the purpose of the study and agree to participate.</span>
                                 </label>
+                                <label class="choice-option consent-choice" for="age-confirmation-checkbox">
+                                    <input
+                                        id="age-confirmation-checkbox"
+                                        name="age-confirmation"
+                                        type="checkbox"
+                                        aria-describedby="age-confirmation-error"
+                                        required
+                                        disabled
+                                    >
+                                    <span>I confirm that I am 18 years of age or older.</span>
+                                </label>
                                 <p id="consent-error" class="field-error" role="alert" hidden>
                                     Consent is required to participate.
+                                </p>
+                                <p id="age-confirmation-error" class="field-error" role="alert" hidden>
+                                    You must confirm that you are 18 or older.
                                 </p>
                             </div>
                         </section>

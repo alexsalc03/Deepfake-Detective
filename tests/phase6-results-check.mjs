@@ -117,12 +117,31 @@ async function completeDemographics(client) {
                 control.dispatchEvent(new Event(eventName, { bubbles: true }));
             };
             const clickNext = () => document.querySelector("#start-experiment").click();
+            const require = (condition, message) => { if (!condition) throw new Error(message); };
+            const ageConfirmation = document.querySelector("#age-confirmation-checkbox");
+            require(ageConfirmation?.checkVisibility(), "18+ confirmation is visible");
+            require(!ageConfirmation.checked, "18+ confirmation starts unchecked");
+            require(ageConfirmation.required, "18+ confirmation is required");
+            require(document.querySelector('label[for="age-confirmation-checkbox"]'),
+                "18+ confirmation has an associated label");
+            require(document.querySelector("#start-experiment").disabled,
+                "Continue starts disabled");
             document.querySelector("#consent-checkbox").click();
+            require(document.querySelector("#start-experiment").disabled,
+                "Existing consent alone does not enable Continue");
+            clickNext();
+            require(introStep === 0, "Existing consent alone cannot proceed");
+            ageConfirmation.click();
+            require(!document.querySelector("#start-experiment").disabled,
+                "All consent requirements enable Continue");
             clickNext();
             const genderOptions = [...document.querySelector("#demographic-gender").options]
                 .slice(1)
                 .map(({ value }) => value);
-            const require = (condition, message) => { if (!condition) throw new Error(message); };
+            const ageQuestion = demographicsConfig.questions.find(({ id }) => id === "age");
+            const ageInput = document.querySelector("#demographic-age");
+            require(ageInput.min === "18", "Age input starts at 18");
+            require(ageInput.max === "100", "Age input preserves its upper limit");
             require(
                 JSON.stringify(genderOptions) === JSON.stringify(["Male", "Female"]),
                 "Gender renders only Male and Female"
@@ -135,13 +154,25 @@ async function completeDemographics(client) {
                 getQuestionElement("nationality").querySelector(".question-help").textContent.includes("Prefer not to say"),
                 "Nationality provides a Prefer not to say response"
             );
-            setValue("#demographic-age", "25");
+            setValue("#demographic-age", "17");
             setValue("#demographic-gender", "Female", "change");
             setValue("#demographic-nationality", "Swiss and Italian");
             setValue("#demographic-education_level", "University degree", "change");
             const scale = document.querySelector('[data-demographic-id="political_leaning"] input[type="range"]');
             scale.value = "4";
             scale.dispatchEvent(new Event("input", { bubbles: true }));
+            require(!validateQuestion(ageQuestion).valid,
+                "Programmatically supplied ages below 18 are rejected");
+            clickNext();
+            require(introStep === 1, "An age below 18 prevents progression");
+            require(
+                getQuestionElement("age").querySelector(".field-error").textContent.includes("18"),
+                "An invalid age displays the minimum age"
+            );
+            setValue("#demographic-age", "18");
+            require(validateQuestion(ageQuestion).valid, "Age 18 is accepted");
+            setValue("#demographic-age", "25");
+            require(validateQuestion(ageQuestion).valid, "Adult ages above 18 are accepted");
             clickNext();
             document.querySelector('input[name="demographic-ai_sentiment"][value="Unsure"]').click();
             require(introStep === 2, "Continue reaches AI questionnaire");
@@ -892,6 +923,7 @@ async function run() {
                     stage: document.body.dataset.activeStage,
                     session: participantSession,
                     consentChecked: document.querySelector("#consent-checkbox").checked,
+                    ageConfirmationChecked: document.querySelector("#age-confirmation-checkbox").checked,
                     ageValue: document.querySelector("#demographic-age").value,
                     submissionStatus: document.querySelector("#submission-status").textContent.trim(),
                     submitText: document.querySelector("#submit-results").textContent.trim(),
@@ -921,6 +953,7 @@ async function run() {
             isComplete: false,
         });
         assert.equal(resetState.consentChecked, false);
+        assert.equal(resetState.ageConfirmationChecked, false);
         assert.equal(resetState.ageValue, "");
         assert.equal(resetState.submissionStatus, "Your results have not been submitted.");
         assert.equal(resetState.submitText, "Submit Results");

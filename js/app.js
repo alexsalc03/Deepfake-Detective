@@ -73,6 +73,12 @@ const demographicsConfigStatus = document.querySelector("#demographics-config-st
 const consentStatement = document.querySelector("#consent-statement");
 const consentCheckbox = document.querySelector("#consent-checkbox");
 const consentError = document.querySelector("#consent-error");
+const ageConfirmationCheckbox = document.querySelector(
+    "#age-confirmation-checkbox",
+);
+const ageConfirmationError = document.querySelector(
+    "#age-confirmation-error",
+);
 const formErrorSummary = document.querySelector("#form-error-summary");
 const startExperimentButton = document.querySelector("#start-experiment");
 const learningConfigStatus = document.querySelector("#learning-config-status");
@@ -263,6 +269,13 @@ function isQuestionApplicable(question) {
     return question.showIf.values.includes(selected?.value);
 }
 
+function updateStartExperimentButtonState() {
+    startExperimentButton.disabled =
+        !formReady ||
+        !consentCheckbox.checked ||
+        !ageConfirmationCheckbox.checked;
+}
+
 function showIntroStep(step, moveFocus = true) {
     introStep = step;
     document.querySelector("#welcome-introduction").hidden = step !== 0;
@@ -271,6 +284,7 @@ function showIntroStep(step, moveFocus = true) {
     document.querySelector("#intro-back").hidden = step === 0;
     document.querySelector("#intro-progress").textContent = `Step ${step + 1} of 3`;
     startExperimentButton.textContent = step === 2 ? "Start Experiment" : "Continue";
+    updateStartExperimentButtonState();
     const heading = document.querySelector("#demographics-heading");
     heading.textContent = step === 2 ? "AI experience and attitudes" : "About you";
     demographicsConfig?.questions.forEach((question) => {
@@ -331,6 +345,8 @@ function clearQuestionError(questionElement) {
 function clearConsentError() {
     consentError.hidden = true;
     consentCheckbox.removeAttribute("aria-invalid");
+    ageConfirmationError.hidden = true;
+    ageConfirmationCheckbox.removeAttribute("aria-invalid");
 }
 
 function createChoiceQuestion(question) {
@@ -982,6 +998,8 @@ function setParticipationUnavailable(message, isError = false) {
     demographicsConfigStatus.classList.toggle("is-error", isError);
     consentCheckbox.disabled = true;
     consentCheckbox.checked = false;
+    ageConfirmationCheckbox.disabled = true;
+    ageConfirmationCheckbox.checked = false;
     startExperimentButton.disabled = true;
 }
 
@@ -1011,6 +1029,7 @@ function initialiseDemographics(config) {
     clearConsentError();
     formErrorSummary.hidden = true;
     consentCheckbox.checked = false;
+    ageConfirmationCheckbox.checked = false;
 
     if (questions === null || !questions.every((question) => isConfiguredQuestion(question, questions))) {
         setParticipationUnavailable(
@@ -1049,7 +1068,8 @@ function initialiseDemographics(config) {
     demographicsConfigStatus.hidden = true;
     formReady = questions.length > 0 && hasConsentStatement;
     consentCheckbox.disabled = !formReady;
-    startExperimentButton.disabled = !formReady;
+    ageConfirmationCheckbox.disabled = !formReady;
+    updateStartExperimentButtonState();
 }
 
 function validateQuestion(question) {
@@ -1216,7 +1236,9 @@ function validateDemographics(questions = demographicsConfig.questions) {
     });
 
     const consentIsValid = consentCheckbox.checked;
+    const ageConfirmationIsValid = ageConfirmationCheckbox.checked;
     consentError.hidden = consentIsValid;
+    ageConfirmationError.hidden = ageConfirmationIsValid;
 
     if (consentIsValid) {
         consentCheckbox.removeAttribute("aria-invalid");
@@ -1224,8 +1246,17 @@ function validateDemographics(questions = demographicsConfig.questions) {
         consentCheckbox.setAttribute("aria-invalid", "true");
     }
 
+    if (ageConfirmationIsValid) {
+        ageConfirmationCheckbox.removeAttribute("aria-invalid");
+    } else {
+        ageConfirmationCheckbox.setAttribute("aria-invalid", "true");
+    }
+
     return {
-        isValid: !firstInvalidElement && consentIsValid,
+        isValid:
+            !firstInvalidElement &&
+            consentIsValid &&
+            ageConfirmationIsValid,
         responses,
         firstInvalidElement,
     };
@@ -2519,12 +2550,14 @@ function handleDemographicsSubmit(event) {
     const validation = validateDemographics(questions);
     if (!validation.isValid) {
         formErrorSummary.textContent =
-            "Please correct the highlighted fields and confirm consent before continuing.";
+            "Please correct the highlighted fields and confirm the consent requirements before continuing.";
         formErrorSummary.hidden = false;
 
         const focusTarget =
             validation.firstInvalidElement?.querySelector("input, select") ??
-            consentCheckbox;
+            (!consentCheckbox.checked
+                ? consentCheckbox
+                : ageConfirmationCheckbox);
         focusTarget.focus();
         return;
     }
@@ -2539,10 +2572,23 @@ function handleDemographicsSubmit(event) {
         const question = demographicsConfig.questions.find(
             (item) => getQuestionElement(item.id) === completeValidation.firstInvalidElement,
         );
-        showIntroStep(!consentCheckbox.checked ? 0 : question?.section === "ai" ? 2 : 1);
+        showIntroStep(
+            !consentCheckbox.checked || !ageConfirmationCheckbox.checked
+                ? 0
+                : question?.section === "ai"
+                  ? 2
+                  : 1,
+        );
         formErrorSummary.textContent = "Please complete the highlighted fields before continuing.";
         formErrorSummary.hidden = false;
-        (completeValidation.firstInvalidElement?.querySelector("input, select") ?? consentCheckbox).focus();
+        (
+            completeValidation.firstInvalidElement?.querySelector(
+                "input, select",
+            ) ??
+            (!consentCheckbox.checked
+                ? consentCheckbox
+                : ageConfirmationCheckbox)
+        ).focus();
         return;
     }
     if (!participantSession.participantId) {
@@ -2579,8 +2625,12 @@ demographicsForm.addEventListener("change", (event) => {
         showIntroStep(introStep, false);
     }
     clearQuestionError(event.target.closest("[data-demographic-question]"));
-    if (event.target === consentCheckbox) {
+    if (
+        event.target === consentCheckbox ||
+        event.target === ageConfirmationCheckbox
+    ) {
         clearConsentError();
+        updateStartExperimentButtonState();
     }
     formErrorSummary.hidden = true;
 });
