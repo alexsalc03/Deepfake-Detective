@@ -134,10 +134,6 @@ const supportedQuestionTypes = new Set([
     "checkbox",
     "range",
 ]);
-const exclusiveNationalityValues = new Set([
-    "Prefer not to answer",
-    "Stateless",
-]);
 
 let currentStageIndex = 0;
 let introStep = 0;
@@ -439,7 +435,6 @@ function createNationalityCombobox({
     controlId,
     describedBy,
     required,
-    onSelect,
 }) {
     const wrapper = createElement("div", "nationality-combobox");
     const input = document.createElement("input");
@@ -454,8 +449,6 @@ function createNationalityCombobox({
     input.required = required;
     input.autocomplete = "off";
     input.spellcheck = false;
-    input.dataset.nationalitySlot = controlId;
-    input.dataset.nationalityRequired = String(required);
     input.setAttribute("role", "combobox");
     input.setAttribute("aria-autocomplete", "list");
     input.setAttribute("aria-haspopup", "listbox");
@@ -501,12 +494,6 @@ function createNationalityCombobox({
     }
 
     function selectNationality(value) {
-        if (onSelect && onSelect(value) === false) {
-            input.value = input.dataset.selectedNationality ?? "";
-            closeSuggestions();
-            return;
-        }
-
         input.value = value;
         input.dataset.selectedNationality = value;
         closeSuggestions();
@@ -606,11 +593,7 @@ function createNationalityCombobox({
         closeSuggestions();
     });
 
-    return {
-        wrapper,
-        input,
-        closeSuggestions,
-    };
+    return wrapper;
 }
 
 function createNationalityQuestion(question) {
@@ -630,92 +613,12 @@ function createNationalityQuestion(question) {
     error.hidden = true;
 
     const describedBy = `${help.id} ${error.id}`;
-    let additionalControl;
-    let primaryControl;
-
-    function setAdditionalDisabled(disabled) {
-        if (!additionalControl) return;
-        additionalControl.input.disabled = disabled;
-        additionalControl.wrapper.classList.toggle("is-disabled", disabled);
-        if (disabled) {
-            additionalControl.input.value = "";
-            delete additionalControl.input.dataset.selectedNationality;
-            additionalControl.closeSuggestions();
-        }
-    }
-
-    primaryControl = createNationalityCombobox({
+    const control = createNationalityCombobox({
         controlId: getQuestionControlId(question.id),
         describedBy,
         required: Boolean(question.required),
-        onSelect(value) {
-            const additionalValue =
-                additionalControl?.input.dataset.selectedNationality;
-            if (additionalValue === value) {
-                setQuestionError(
-                    container,
-                    "That nationality is already selected.",
-                );
-                return false;
-            }
-            if (exclusiveNationalityValues.has(value)) {
-                setAdditionalDisabled(true);
-            }
-            clearQuestionError(container);
-            return true;
-        },
     });
-    primaryControl.input.addEventListener("input", () => {
-        setAdditionalDisabled(false);
-    });
-
-    container.append(label, help, primaryControl.wrapper);
-
-    if (question.allowMultiple) {
-        const additionalLabel = createElement(
-            "label",
-            "question-label nationality-additional-label",
-            "Additional nationality (optional)",
-        );
-        additionalLabel.htmlFor = `${getQuestionControlId(question.id)}-additional`;
-        additionalControl = createNationalityCombobox({
-            controlId: `${getQuestionControlId(question.id)}-additional`,
-            describedBy,
-            required: false,
-            onSelect(value) {
-                const primaryValue =
-                    primaryControl.input.dataset.selectedNationality;
-                if (exclusiveNationalityValues.has(value)) {
-                    setQuestionError(
-                        container,
-                        "Choose “Prefer not to answer” or “Stateless” on its own.",
-                    );
-                    return false;
-                }
-                if (primaryValue === value) {
-                    setQuestionError(
-                        container,
-                        "That nationality is already selected.",
-                    );
-                    return false;
-                }
-                if (
-                    exclusiveNationalityValues.has(primaryValue) &&
-                    primaryValue !== value
-                ) {
-                    setQuestionError(
-                        container,
-                        "Choose “Prefer not to answer” or “Stateless” on its own.",
-                    );
-                    return false;
-                }
-                clearQuestionError(container);
-                return true;
-            },
-        });
-        container.append(additionalLabel, additionalControl.wrapper);
-    }
-
+    container.append(label, help, control);
     container.append(error);
     return container;
 }
@@ -892,11 +795,8 @@ function isConfiguredQuestion(question, questions) {
         question.type === "checkbox" && hasValidOptions &&
         question.options.includes(question.exclusiveOption)
     );
-    const hasValidNationalitySettings = question?.type !== "nationality" || (
-        nationalityOptions.length > 0 &&
-        (question.allowMultiple === undefined ||
-            typeof question.allowMultiple === "boolean")
-    );
+    const hasValidNationalitySettings =
+        question?.type !== "nationality" || nationalityOptions.length > 0;
     let hasValidCondition = question?.showIf === undefined;
     if (isRecord(question?.showIf)) {
         const parent = questions.find((item) => item?.id === question.showIf.questionId);
@@ -1408,72 +1308,34 @@ function validateQuestion(question) {
     const questionElement = getQuestionElement(question.id);
 
     if (question.type === "nationality") {
-        const controls = [
-            ...questionElement.querySelectorAll("[data-nationality-slot]"),
-        ].filter((control) => !control.disabled);
-        const selectedValues = [];
-
-        for (const control of controls) {
-            const selectedValue = control.dataset.selectedNationality ?? "";
-            const rawValue = control.value.trim();
-
-            if (rawValue !== selectedValue) {
-                return {
-                    valid: false,
-                    message: "Select a nationality from the list.",
-                    value: selectedValues.join("; "),
-                };
-            }
-            if (selectedValue && !nationalityOptions.includes(selectedValue)) {
-                return {
-                    valid: false,
-                    message: "Select a nationality from the list.",
-                    value: selectedValues.join("; "),
-                };
-            }
-            if (selectedValue && selectedValues.includes(selectedValue)) {
-                return {
-                    valid: false,
-                    message: "Select each nationality only once.",
-                    value: selectedValues.join("; "),
-                };
-            }
-            if (selectedValue) {
-                selectedValues.push(selectedValue);
-            }
-        }
+        const control = questionElement.querySelector(".nationality-input");
+        const selectedValue = control?.dataset.selectedNationality ?? "";
+        const rawValue = control?.value.trim() ?? "";
 
         if (
-            question.required &&
-            !questionElement.querySelector(
-                '[data-nationality-slot="demographic-nationality"]',
-            )?.dataset.selectedNationality
+            !control ||
+            rawValue !== selectedValue ||
+            (selectedValue && !nationalityOptions.includes(selectedValue))
         ) {
             return {
                 valid: false,
                 message: "Select a nationality from the list.",
-                value: selectedValues.join("; "),
+                value: selectedValue,
             };
         }
 
-        if (
-            selectedValues.length > 1 &&
-            selectedValues.some((value) =>
-                exclusiveNationalityValues.has(value),
-            )
-        ) {
+        if (question.required && !selectedValue) {
             return {
                 valid: false,
-                message:
-                    "Choose “Prefer not to answer” or “Stateless” on its own.",
-                value: selectedValues.join("; "),
+                message: "Select a nationality from the list.",
+                value: "",
             };
         }
 
         return {
             valid: true,
             message: "",
-            value: selectedValues.join("; "),
+            value: selectedValue,
         };
     }
 

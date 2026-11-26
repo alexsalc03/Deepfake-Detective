@@ -375,10 +375,6 @@ fieldset.form-question {
     position: relative;
 }
 
-.nationality-combobox.is-disabled {
-    opacity: 0.65;
-}
-
 .nationality-options {
     position: absolute;
     z-index: 10;
@@ -421,10 +417,6 @@ fieldset.form-question {
     color: var(--text-secondary);
     font-size: 0.84rem;
     line-height: 1.4;
-}
-
-.nationality-additional-label {
-    margin-top: 16px;
 }
 
 .choice-list {

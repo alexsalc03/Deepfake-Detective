@@ -152,8 +152,13 @@ async function completeDemographics(client) {
                 "Nationality uses a searchable combobox"
             );
             require(
-                getQuestionElement("nationality").querySelector(".question-help").textContent.includes("second nationality"),
-                "Nationality explains the optional second selection"
+                document.querySelectorAll(
+                    '[data-demographic-id="nationality"] input[type="text"]'
+                ).length === 1 &&
+                    document.querySelector(
+                        "#demographic-nationality-additional"
+                    ) === null,
+                "Nationality renders exactly one searchable field"
             );
             const selectNationality = (selector, query, optionText) => {
                 const input = document.querySelector(selector);
@@ -171,11 +176,6 @@ async function completeDemographics(client) {
             setValue("#demographic-age", "17");
             setValue("#demographic-gender", "Female", "change");
             selectNationality("#demographic-nationality", "It", "Italy");
-            selectNationality(
-                "#demographic-nationality-additional",
-                "Swi",
-                "Switzerland"
-            );
             setValue("#demographic-education_level", "University degree", "change");
             const scale = document.querySelector('[data-demographic-id="political_leaning"] input[type="range"]');
             scale.value = "4";
@@ -728,7 +728,7 @@ async function run() {
         assert.equal(payload.participantId.length > 0, true);
         assert.equal(payload.demographics.age, 25);
         assert.equal(payload.demographics.gender, "Female");
-        assert.equal(payload.demographics.nationality, "Italy; Switzerland");
+        assert.equal(payload.demographics.nationality, "Italy");
         assert.equal(payload.demographics.education_level, "University degree");
         assert.equal(payload.demographics.political_leaning, 4);
         assert.equal(payload.demographics.ai_sentiment, "Unsure");

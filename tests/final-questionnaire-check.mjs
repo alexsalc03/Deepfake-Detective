@@ -311,8 +311,8 @@ async function run() {
                 })
         `);
         assert.ok(
-            nationalityData.length >= 240,
-            "the local nationality list is comprehensive",
+            nationalityData.length === 251,
+            "the local nationality list keeps all 251 options",
         );
         assert.equal(
             new Set(nationalityData).size,
@@ -360,6 +360,27 @@ async function run() {
                     ].slice(1).map(({ value }) => value),
                     primaryRole: primary.getAttribute("role"),
                     primaryExpanded: primary.getAttribute("aria-expanded"),
+                    nationalityInputCount: document.querySelectorAll(
+                        '[data-demographic-id="nationality"] input[type="text"]'
+                    ).length,
+                    nationalityComboboxCount: document.querySelectorAll(
+                        '[data-demographic-id="nationality"] .nationality-combobox'
+                    ).length,
+                    additionalControlAbsent:
+                        document.querySelector(
+                            "#demographic-nationality-additional"
+                        ) === null,
+                    additionalLabelAbsent: ![
+                        ...document.querySelectorAll(
+                            '[data-demographic-id="nationality"] label'
+                        )
+                    ].some(({ textContent }) =>
+                        /additional nationality/i.test(textContent)
+                    ),
+                    secondaryNationalityCopyAbsent:
+                        !/(?:second|another|additional) nationality/i.test(
+                            getQuestionElement("nationality").textContent
+                        ),
                     listVisible: !document.querySelector(
                         "#demographic-nationality-listbox"
                     ).hidden,
@@ -386,6 +407,11 @@ async function run() {
             ],
             primaryRole: "combobox",
             primaryExpanded: "true",
+            nationalityInputCount: 1,
+            nationalityComboboxCount: 1,
+            additionalControlAbsent: true,
+            additionalLabelAbsent: true,
+            secondaryNationalityCopyAbsent: true,
             listVisible: true,
             listboxRole: "listbox",
             optionCount: nationalityData.length,
@@ -424,10 +450,30 @@ async function run() {
             "filtered suggestions are case-insensitive partial matches",
         );
 
+        const accentFilteredOptions = await client.evaluate(`
+            (() => {
+                const input = document.querySelector("#demographic-nationality");
+                input.value = "cote";
+                input.dispatchEvent(new InputEvent("input", { bubbles: true }));
+                return [
+                    ...document.querySelectorAll(
+                        '#demographic-nationality-listbox [role="option"]'
+                    )
+                ].map(({ textContent }) => textContent);
+            })()
+        `);
+        assert.deepEqual(
+            accentFilteredOptions,
+            ["Côte d’Ivoire"],
+            "filtering ignores accents and letter case",
+        );
+
         await setViewport(client, 390, 844, true);
         const mobileSelection = await client.evaluate(`
             (() => {
                 const input = document.querySelector("#demographic-nationality");
+                input.value = "It";
+                input.dispatchEvent(new InputEvent("input", { bubbles: true }));
                 input.focus();
                 input.dispatchEvent(new KeyboardEvent("keydown", {
                     key: "ArrowDown",
@@ -459,15 +505,13 @@ async function run() {
 
         const mouseSelection = await client.evaluate(`
             (() => {
-                const input = document.querySelector(
-                    "#demographic-nationality-additional"
-                );
+                const input = document.querySelector("#demographic-nationality");
                 input.focus();
                 input.value = "Swi";
                 input.dispatchEvent(new InputEvent("input", { bubbles: true }));
                 const option = [
                     ...document.querySelectorAll(
-                        '#demographic-nationality-additional-listbox [role="option"]'
+                        '#demographic-nationality-listbox [role="option"]'
                     )
                 ].find(({ textContent }) => textContent === "Switzerland");
                 option.click();
@@ -493,40 +537,6 @@ async function run() {
         await captureViewport(
             client,
             "/tmp/final-questionnaire-mobile.png",
-        );
-
-        const duplicatePrevention = await client.evaluate(`
-            (() => {
-                const input = document.querySelector(
-                    "#demographic-nationality-additional"
-                );
-                input.focus();
-                input.value = "It";
-                input.dispatchEvent(new InputEvent("input", { bubbles: true }));
-                const option = [
-                    ...document.querySelectorAll(
-                        '#demographic-nationality-additional-listbox [role="option"]'
-                    )
-                ].find(({ textContent }) => textContent === "Italy");
-                option.click();
-                return {
-                    value: input.value,
-                    selected: input.dataset.selectedNationality,
-                    error: getQuestionElement("nationality")
-                        .querySelector(".field-error").textContent
-                };
-            })()
-        `);
-        assert.equal(
-            duplicatePrevention.value,
-            "Switzerland",
-            "selecting a duplicate keeps the existing additional nationality",
-        );
-        assert.equal(duplicatePrevention.selected, "Switzerland");
-        assert.match(
-            duplicatePrevention.error,
-            /already selected/i,
-            "duplicate nationality selection is explained",
         );
 
         const invalidEntryState = await client.evaluate(`
@@ -588,15 +598,9 @@ async function run() {
                     "Prefer",
                     "Prefer not to answer"
                 );
-                const additional = document.querySelector(
-                    "#demographic-nationality-additional"
-                );
-                const additionalWasCleared =
-                    additional.value === "" && additional.disabled;
                 document.querySelector("#start-experiment").click();
                 return {
                     introStep,
-                    additionalWasCleared,
                     primary: document.querySelector(
                         "#demographic-nationality"
                     ).dataset.selectedNationality
@@ -607,7 +611,6 @@ async function run() {
             preferenceState,
             {
                 introStep: 2,
-                additionalWasCleared: true,
                 primary: "Prefer not to answer",
             },
             "the opt-out nationality is accepted on its own",
@@ -629,11 +632,6 @@ async function run() {
                     option.click();
                 };
                 selectOption("#demographic-nationality", "It", "Italy");
-                selectOption(
-                    "#demographic-nationality-additional",
-                    "Swi",
-                    "Switzerland"
-                );
                 document.querySelector("#start-experiment").click();
                 document.querySelector(
                     'input[name="demographic-ai_sentiment"][value="Unsure"]'
@@ -657,6 +655,10 @@ async function run() {
                 return {
                     nationality: participantSession.demographics.nationality,
                     payloadNationality: payload.demographics.nationality,
+                    nationalityKeys: Object.keys(payload.demographics).filter(
+                        (key) => /nationality/i.test(key)
+                    ),
+                    nationalityType: typeof payload.demographics.nationality,
                     gender: participantSession.demographics.gender,
                     payloadGender: payload.demographics.gender
                 };
@@ -665,12 +667,14 @@ async function run() {
         assert.deepEqual(
             storedPayload,
             {
-                nationality: "Italy; Switzerland",
-                payloadNationality: "Italy; Switzerland",
+                nationality: "Italy",
+                payloadNationality: "Italy",
+                nationalityKeys: ["nationality"],
+                nationalityType: "string",
                 gender: "Non-binary",
                 payloadGender: "Non-binary",
             },
-            "validated demographics are preserved in the submission payload",
+            "the submission payload contains exactly one nationality string",
         );
 
         const genderValidation = await client.evaluate(`

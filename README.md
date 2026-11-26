@@ -175,16 +175,15 @@ The current demographic section includes age, gender (Male, Female, Non-binary,
 or Prefer not to answer), a required searchable nationality field, and
 education. Nationality options come from `data/nationalities.json`: 249 current
 ISO 3166-1 country and territory names, followed by “Prefer not to answer” and
-“Stateless”. Participants can select one optional second nationality. Selected
-values are validated against this local list and stored as a canonical string,
-for example `Italy; Switzerland`, in `demographics.nationality`.
+“Stateless”. Participants select one nationality. The value is validated against
+this local list and stored as a canonical string, for example `Italy`, in
+`demographics.nationality`.
 
 `options` is required for `select`, `radio`, and `checkbox` questions and is
 omitted for `text`, `number`, and `nationality` questions. Nationality questions
-use the shared list in `data/nationalities.json`; `allowMultiple: true` adds the
-optional second selection. An empty consent statement or an empty question
-array leaves participation disabled. Optional inclusive `min` and `max` bounds
-can be added to `number` questions.
+use the shared list in `data/nationalities.json`. An empty consent statement or
+an empty question array leaves participation disabled. Optional inclusive `min`
+and `max` bounds can be added to `number` questions.
 
 `range` questions use integer `min`/`max` bounds and `minLabel`/`maxLabel`
 endpoint labels. Their `options` are separate radio alternatives to the slider.

@@ -355,7 +355,7 @@ function currentPayload() {
         demographics: {
             age: 23,
             gender: "Non-binary",
-            nationality: "Italy; Switzerland",
+            nationality: "Italy",
             education_level: "University degree",
             political_leaning: 4,
             ai_sentiment: "Equally concerned and excited",
@@ -479,7 +479,7 @@ function currentPayload() {
     );
     assert.equal(
         participants.rows[0][PARTICIPANT_HEADERS.length - 1],
-        "Italy; Switzerland",
+        "Italy",
         "nationality is written to its appended dedicated column",
     );
     assert.equal(

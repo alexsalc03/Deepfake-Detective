@@ -26,9 +26,8 @@
         {
             "id": "nationality",
             "label": "What is your nationality?",
-            "helpText": "Start typing to search the list. You can add a second nationality if applicable.",
+            "helpText": "Start typing to search the list.",
             "type": "nationality",
-            "allowMultiple": true,
             "required": true,
             "section": "demographics"
         },

@@ -153,8 +153,13 @@ async function completeDemographics(client) {
                 "Nationality renders as a searchable combobox"
             );
             require(
-                getQuestionElement("nationality").querySelector(".question-help").textContent.includes("second nationality"),
-                "Nationality explains the optional second selection"
+                document.querySelectorAll(
+                    '[data-demographic-id="nationality"] input[type="text"]'
+                ).length === 1 &&
+                    document.querySelector(
+                        "#demographic-nationality-additional"
+                    ) === null,
+                "Nationality renders exactly one searchable field"
             );
             setValue("#demographic-age", "25");
             setValue("#demographic-gender", "Male", "change");
@@ -172,11 +177,6 @@ async function completeDemographics(client) {
                 option.click();
             };
             selectNationality("#demographic-nationality", "It", "Italy");
-            selectNationality(
-                "#demographic-nationality-additional",
-                "Swi",
-                "Switzerland"
-            );
             setValue("#demographic-education_level", "University degree", "change");
             const scale = document.querySelector('[data-demographic-id="political_leaning"] input[type="range"]');
             scale.value = "4";
@@ -204,7 +204,7 @@ async function completeDemographics(client) {
         {
             age: 25,
             gender: "Male",
-            nationality: "Italy; Switzerland",
+            nationality: "Italy",
             education: "University degree",
         },
         "the demographic answers are stored without affecting neighboring fields",
