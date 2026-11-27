@@ -2704,10 +2704,12 @@ function renderLearningStage(moveFocus = false) {
     renderLearningConcepts(module);
     renderLearningQuiz(module, moduleIndex);
 
-    learningContinue.textContent =
-        moduleIndex === learningModules.length - 1
-            ? "Continue to Round-2"
-            : "Continue";
+    const isLastModule = moduleIndex === learningModules.length - 1;
+    const isLastQuestion = module.type !== "quiz" ||
+        currentLearningQuestionIndex === module.questions.length - 1;
+    learningContinue.textContent = isLastModule && isLastQuestion
+        ? "Continue to Round-2"
+        : "Continue";
 
     if (moveFocus) {
         learningModuleTitle.focus({ preventScroll: true });
