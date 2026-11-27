@@ -250,6 +250,7 @@ function showStage(stageIndex, moveFocus = true) {
     if (moveFocus) {
         const activeHeading = activeScreen.querySelector("h2");
         activeHeading.focus({ preventScroll: true });
+        window.scrollTo({ top: 0, left: 0, behavior: "instant" });
     }
 }
 
@@ -301,7 +302,8 @@ function showIntroStep(step, moveFocus = true) {
     });
     formErrorSummary.hidden = true;
     if (moveFocus) {
-        (step === 0 ? document.querySelector("#welcome-title") : heading).focus();
+        (step === 0 ? document.querySelector("#welcome-title") : heading).focus({ preventScroll: true });
+        window.scrollTo({ top: 0, left: 0, behavior: "instant" });
     }
 }
 
@@ -2442,6 +2444,8 @@ function handleAssessmentSubmit(event) {
     }
 
     renderAssessmentStage(mode);
+    assessmentTitle.focus({ preventScroll: true });
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
 }
 
 function clearLearningConcepts() {
@@ -2706,7 +2710,8 @@ function renderLearningStage(moveFocus = false) {
             : "Continue";
 
     if (moveFocus) {
-        learningModuleTitle.focus();
+        learningModuleTitle.focus({ preventScroll: true });
+        window.scrollTo({ top: 0, left: 0, behavior: "instant" });
     }
 }
 
