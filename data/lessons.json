@@ -2,8 +2,8 @@
   {
     "id": "deepfake-clues",
     "type": "content",
-    "title": "How people detect deepfakes, and where do they go wrong?",
-    "introduction": "Next you will watch more clips of politicians, some authentic and some AI-generated. Here is what research shows about which cues help and which mislead.",
+    "title": "How to detect Deepfakes",
+    "introduction": "Here is what research shows about which cues help and which mislead.",
     "contentHeading": "Part 1: Five things to know",
     "clues": [
       {

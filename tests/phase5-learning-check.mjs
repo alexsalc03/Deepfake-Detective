@@ -446,9 +446,9 @@ async function run() {
         `);
         assert.deepEqual(contentModule, {
             progress: "Module 1 of 2",
-            title: "How people detect deepfakes, and where do they go wrong?",
+            title: "How to detect Deepfakes",
             introduction:
-                "Next you will watch more clips of politicians, some authentic and some AI-generated. Here is what research shows about which cues help and which mislead.",
+                "Here is what research shows about which cues help and which mislead.",
             heading: "Part 1: Five things to know",
             clueCount: 5,
             clueNumbers: ["01", "02", "03", "04", "05"],
