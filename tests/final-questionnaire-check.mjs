@@ -343,6 +343,32 @@ async function run() {
             })()
         `);
 
+        const touchSelection = await client.evaluate(`
+            (() => {
+                const input = document.querySelector("#demographic-nationality");
+                input.focus();
+                input.dispatchEvent(new FocusEvent("focus"));
+                const option = document.querySelector('#demographic-nationality-listbox [role="option"]');
+                const touch = (y) => new Touch({ identifier: 1, target: option, clientX: 20, clientY: y });
+                const fire = (type, touches) => option.dispatchEvent(new TouchEvent(type, {
+                    bubbles: true, cancelable: true, touches,
+                }));
+                fire("touchstart", [touch(20)]);
+                fire("touchmove", [touch(60)]);
+                fire("touchend", []);
+                const scrollDidNotSelect = !input.dataset.selectedNationality;
+                fire("touchstart", [touch(20)]);
+                input.dispatchEvent(new FocusEvent("blur", { relatedTarget: null }));
+                fire("touchend", []);
+                const tapSelected = input.value === option.textContent &&
+                    input.dataset.selectedNationality === option.textContent;
+                input.value = "";
+                delete input.dataset.selectedNationality;
+                return { scrollDidNotSelect, tapSelected };
+            })()
+        `);
+        assert.deepEqual(touchSelection, { scrollDidNotSelect: true, tapSelected: true });
+
         const desktopState = await client.evaluate(`
             (() => {
                 const primary = document.querySelector("#demographic-nationality");

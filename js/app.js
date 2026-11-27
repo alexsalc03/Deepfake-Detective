@@ -515,8 +515,25 @@ function createNationalityCombobox({
             option.setAttribute("role", "option");
             option.setAttribute("aria-selected", "false");
             option.addEventListener("pointerdown", (event) => {
-                event.preventDefault();
+                if (event.pointerType === "mouse") event.preventDefault();
             });
+            let touchStart = null;
+            option.addEventListener("touchstart", (event) => {
+                const touch = event.touches[0];
+                touchStart = { x: touch.clientX, y: touch.clientY };
+            }, { passive: true });
+            option.addEventListener("touchmove", (event) => {
+                const touch = event.touches[0];
+                if (touchStart && Math.hypot(touch.clientX - touchStart.x,
+                    touch.clientY - touchStart.y) > 10) touchStart = null;
+            }, { passive: true });
+            option.addEventListener("touchcancel", () => { touchStart = null; });
+            option.addEventListener("touchend", (event) => {
+                if (!touchStart) return;
+                touchStart = null;
+                event.preventDefault();
+                selectNationality(nationality);
+            }, { passive: false });
             option.addEventListener("click", () => {
                 selectNationality(nationality);
             });
@@ -584,7 +601,14 @@ function createNationalityCombobox({
         }
     });
 
-    input.addEventListener("blur", closeSuggestions);
+    input.addEventListener("blur", (event) => {
+        if (event.relatedTarget && !wrapper.contains(event.relatedTarget)) {
+            closeSuggestions();
+        }
+    });
+    document.addEventListener("pointerdown", (event) => {
+        if (!wrapper.contains(event.target)) closeSuggestions();
+    });
     wrapper.append(input, listbox);
 
     demographicsForm.addEventListener("reset", () => {
